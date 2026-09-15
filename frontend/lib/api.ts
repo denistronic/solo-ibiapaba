@@ -1,8 +1,8 @@
 import type { Sample, SoilAnalysis, SoilReport } from "@/lib/soil";
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
-  "http://localhost:8080/api";
+export const API =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "/api";
 
 type ApiErrorPayload = {
   message?: string;
@@ -44,7 +44,7 @@ async function parseError(response: Response): Promise<ApiError> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${API}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
