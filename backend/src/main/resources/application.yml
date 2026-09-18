@@ -1,6 +1,16 @@
 spring:
   application:
     name: solo-ibiapaba-backend
+  datasource:
+    url: jdbc:h2:file:./data/solo-ibiapaba;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
 
 server:
   port: ${SERVER_PORT:8080}
@@ -13,3 +23,14 @@ management:
   endpoint:
     health:
       show-details: never
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:troque-essa-chave-em-producao-string-bem-longa}
+    expiration-minutes: 60
+
+app:
+  admin:
+    name: ${ADMIN_NAME:Administrador}
+    email: ${ADMIN_EMAIL:admin@soloibiapaba.com}
+    password: ${ADMIN_PASSWORD:troque-esta-senha}
