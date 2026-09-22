@@ -25,6 +25,7 @@ frontend
 
 
 Verificar as tabelas:
+
 ``
 docker compose exec database sh -lc \
   'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt"'
@@ -36,19 +37,23 @@ sample_sequences
 samples
 
 Verificar o backend:
+
 ``
 curl http://127.0.0.1:8080/api/health
 ``
 Resultado esperado:
+
 ``
 {"status":"ok"}
 ``
+
 Verificar logs:
 
+``
 docker compose logs --tail=100 backend
 docker compose logs --tail=50 frontend
 docker compose logs --tail=50 database
-
+``
 Acessar o sistema:
 
 http://localhost:3000
