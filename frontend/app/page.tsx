@@ -10,8 +10,6 @@ import {
   Sprout,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
-import { useRouter } from "next/navigation"; // NOVO (Fase 4)
-import { useAuth } from "@/context/AuthContext"; // NOVO (Fase 4)
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,30 +59,13 @@ function StatusPill({ level }: { level: string }) {
   const slug = level
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replaceAll(" ", "-");
 
   return <span className={`status status-${slug}`}>{level}</span>;
 }
 
 export default function Home() {
-  // NOVO (Fase 4): pega o usuário logado e a função de logout do contexto
-  const { user, loading: authLoading, logout } = useAuth();
-  const router = useRouter();
-
-  // NOVO (Fase 4): se não estiver logado (e já terminou de checar), manda pro /login
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/login");
-    }
-  }, [authLoading, user, router]);
-
-  // NOVO (Fase 5): função chamada pelo botão "Sair"
-  function handleLogout() {
-    logout();
-    router.push("/login");
-  }
-
   const [samples, setSamples] = useState<Sample[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [meta, setMeta] = useState(makeEmptyMeta);
@@ -216,17 +197,6 @@ export default function Home() {
     setTab("cadastro");
   }
 
-  // NOVO (Fase 4): enquanto não sabemos se há usuário, ou se não há usuário,
-  // mostra uma tela simples em vez da tela real (o useEffect acima já está
-  // redirecionando pro /login nesse caso)
-  if (authLoading || !user) {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-neutral-500">Carregando...</p>
-      </main>
-    );
-  }
-
   return (
     <main className="app-shell">
       <Toaster position="top-right" richColors />
@@ -241,34 +211,6 @@ export default function Home() {
         </div>
         <div className="region-tag">
           <Leaf size={15} /> Serra da Ibiapaba · CE
-        </div>
-
-        {/* NOVO (Fase 5): usuário logado, atalho de admin e botão de sair */}
-        <div
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-          }}
-        >
-          {user.role === "ADMIN" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/admin/usuarios")}
-            >
-              Gerenciar usuários
-            </Button>
-          )}
-
-          <span style={{ fontSize: "0.875rem", color: "#6b7280" }}>
-            {user.name} · <strong>{user.role === "ADMIN" ? "Administrador" : "Usuário"}</strong>
-          </span>
-
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            Sair
-          </Button>
         </div>
       </header>
 

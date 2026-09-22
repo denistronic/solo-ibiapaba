@@ -2,6 +2,7 @@ package br.com.soloibiapaba.repository;
 
 import br.com.soloibiapaba.domain.Sample;
 import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -13,6 +14,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Repository
+@Profile("test")
 public class InMemorySampleRepository implements SampleRepository {
 
     private final ConcurrentMap<UUID, Sample> samples = new ConcurrentHashMap<>();

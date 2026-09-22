@@ -1,5 +1,4 @@
 import type { Sample, SoilAnalysis, SoilReport } from "@/lib/soil";
-import { getToken } from "@/lib/token";
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
@@ -44,15 +43,12 @@ async function parseError(response: Response): Promise<ApiError> {
   return new ApiError(message, response.status, payload.fields ?? {});
 }
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken();
-
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
@@ -101,4 +97,3 @@ export function updateAnalysis(id: string, analysis: SoilAnalysis) {
 export function getInterpretation(id: string) {
   return request<SoilReport>(`/samples/${id}/interpretation`);
 }
-

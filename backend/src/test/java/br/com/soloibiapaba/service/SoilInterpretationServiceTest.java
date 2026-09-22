@@ -69,8 +69,8 @@ class SoilInterpretationServiceTest {
         var report = service.analyze(analysis);
 
         assertThat(report.insights()).hasSize(1);
-        assertThat(report.insights().getFirst().title()).isEqualTo("Sem alerta crítico automático");
-        assertThat(report.insights().getFirst().tone()).isEqualTo("good");
+        assertThat(report.insights().get(0).title()).isEqualTo("Sem alerta crítico automático");
+        assertThat(report.insights().get(0).tone()).isEqualTo("good");
     }
 
     private BigDecimal bd(String value) {

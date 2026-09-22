@@ -2,18 +2,22 @@ spring:
   application:
     name: solo-ibiapaba-backend
   datasource:
-    url: jdbc:h2:file:./data/solo-ibiapaba;MODE=PostgreSQL
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-  jpa:
-    hibernate:
-      ddl-auto: validate
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/solo_ibiapaba}
+    username: ${SPRING_DATASOURCE_USERNAME:solo_app}
+    password: ${SPRING_DATASOURCE_PASSWORD:solo_dev_password}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 30000
   flyway:
     enabled: true
+    locations: classpath:db/migration
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
 
 server:
   port: ${SERVER_PORT:8080}
+  shutdown: graceful
 
 management:
   endpoints:
@@ -24,13 +28,6 @@ management:
     health:
       show-details: never
 
-security:
-  jwt:
-    secret: ${JWT_SECRET:troque-essa-chave-em-producao-string-bem-longa}
-    expiration-minutes: 60
-
 app:
-  admin:
-    name: ${ADMIN_NAME:Administrador}
-    email: ${ADMIN_EMAIL:admin@soloibiapaba.com}
-    password: ${ADMIN_PASSWORD:troque-esta-senha}
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}

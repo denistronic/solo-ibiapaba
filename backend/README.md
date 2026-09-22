@@ -9,10 +9,11 @@ Backend Java do MVP **Solo Ibiapaba**, migrado a partir do servidor local Node/J
 - Spring MVC / REST
 - Jakarta Bean Validation
 - Spring Boot Actuator
+- Spring JDBC
+- PostgreSQL 17
+- Flyway
 - Maven
-- Persistência em memória nesta primeira etapa
-
-> O PostgreSQL ainda não é necessário. A camada de persistência foi isolada por `SampleRepository`, permitindo substituir `InMemorySampleRepository` por JPA/PostgreSQL posteriormente sem reescrever os controllers e as regras de negócio.
+- Persistência PostgreSQL; repositório em memória apenas no perfil de testes
 
 ## Requisitos
 
@@ -25,6 +26,9 @@ mvn -version
 ```
 
 O projeto requer Java 25.
+
+Também é necessário um PostgreSQL acessível. No pacote Docker completo, banco,
+backend e frontend são iniciados juntos por `docker compose up --build -d`.
 
 ## Executar
 
@@ -43,6 +47,9 @@ mvn test
 Inicie a API:
 
 ```bash
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/solo_ibiapaba
+export SPRING_DATASOURCE_USERNAME=solo_app
+export SPRING_DATASOURCE_PASSWORD=sua_senha
 mvn spring-boot:run
 ```
 

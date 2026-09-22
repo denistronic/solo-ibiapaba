@@ -7,6 +7,7 @@ import br.com.soloibiapaba.dto.SoilAnalysisRequest;
 import br.com.soloibiapaba.exception.SampleNotFoundException;
 import br.com.soloibiapaba.repository.SampleRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -35,6 +36,7 @@ public class SampleService {
         return repository.findById(id).orElseThrow(() -> new SampleNotFoundException(id));
     }
 
+    @Transactional
     public Sample create(CreateSampleRequest request) {
         int year = clock.instant().atZone(BUSINESS_ZONE).getYear();
         int sequence = repository.nextSequenceForYear(year);
@@ -58,6 +60,7 @@ public class SampleService {
         return repository.save(sample);
     }
 
+    @Transactional
     public Sample updateAnalysis(UUID id, SoilAnalysisRequest request) {
         Sample current = findById(id);
         SoilAnalysis analysis = toDomain(request);
