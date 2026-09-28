@@ -1,4 +1,5 @@
 import type { Sample, SoilAnalysis, SoilReport } from "@/lib/soil";
+import { clearToken, getToken } from "@/lib/token";
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
@@ -43,17 +44,26 @@ async function parseError(response: Response): Promise<ApiError> {
   return new ApiError(message, response.status, payload.fields ?? {});
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
+
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearToken();
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        window.location.assign("/login");
+      }
+    }
     throw await parseError(response);
   }
 

@@ -40,6 +40,45 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleUserNotFound(
+            UserNotFoundException exception,
+            HttpServletRequest request) {
+
+        return build(
+                HttpStatus.NOT_FOUND,
+                exception.getMessage(),
+                request.getRequestURI(),
+                Map.of()
+        );
+    }
+
+    @ExceptionHandler({LastAdminException.class, DuplicateEmailException.class})
+    public ResponseEntity<ApiErrorResponse> handleUserConflict(
+            RuntimeException exception,
+            HttpServletRequest request) {
+
+        return build(
+                HttpStatus.CONFLICT,
+                exception.getMessage(),
+                request.getRequestURI(),
+                Map.of()
+        );
+    }
+
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthentication(
+            org.springframework.security.core.AuthenticationException exception,
+            HttpServletRequest request) {
+
+        return build(
+                HttpStatus.UNAUTHORIZED,
+                "Credenciais inválidas",
+                request.getRequestURI(),
+                Map.of()
+        );
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(
             MethodArgumentNotValidException exception,

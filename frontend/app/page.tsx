@@ -10,6 +10,8 @@ import {
   Sprout,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,6 +68,20 @@ function StatusPill({ level }: { level: string }) {
 }
 
 export default function Home() {
+  const { user, loading: authLoading, logout } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login");
+    }
+  }, [authLoading, user, router]);
+
+  function handleLogout() {
+    logout();
+    router.replace("/login");
+  }
+
   const [samples, setSamples] = useState<Sample[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [meta, setMeta] = useState(makeEmptyMeta);
@@ -197,6 +213,14 @@ export default function Home() {
     setTab("cadastro");
   }
 
+  if (authLoading || !user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-neutral-500">Carregando...</p>
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <Toaster position="top-right" richColors />
@@ -211,6 +235,33 @@ export default function Home() {
         </div>
         <div className="region-tag">
           <Leaf size={15} /> Serra da Ibiapaba · CE
+        </div>
+
+        <div
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+          }}
+        >
+          {user.role === "ADMIN" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/admin/usuarios")}
+            >
+              Gerenciar usuários
+            </Button>
+          )}
+
+          <span style={{ fontSize: "0.875rem", color: "#c8d7d0" }}>
+            {user.name} · {user.role === "ADMIN" ? "Administrador" : "Usuário"}
+          </span>
+
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            Sair
+          </Button>
         </div>
       </header>
 

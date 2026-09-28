@@ -12,6 +12,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
   lifecycle:
     timeout-per-shutdown-phase: 20s
 
@@ -31,3 +35,12 @@ management:
 app:
   cors:
     allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
+  admin:
+    name: ${ADMIN_NAME:Administrador}
+    email: ${ADMIN_EMAIL:admin@soloibiapaba.com}
+    password: ${ADMIN_PASSWORD:troque-esta-senha}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:troque-esta-chave-por-uma-chave-com-pelo-menos-32-caracteres}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}

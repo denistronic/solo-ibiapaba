@@ -3,3 +3,7 @@ backend/target/
 frontend/node_modules/
 frontend/.next/
 *.log
+.idea/
+backend/data/
+frontend/tsconfig.tsbuildinfo
+Claude outputs/
