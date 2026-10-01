@@ -8,6 +8,7 @@ import br.com.soloibiapaba.exception.SampleNotFoundException;
 import br.com.soloibiapaba.repository.SampleRepository;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -65,11 +66,17 @@ public class SampleService {
         return repository.save(updated);
     }
 
+    
     private SoilAnalysis toDomain(SoilAnalysisRequest request) {
+        BigDecimal phWater = request.phCaCl2() == null
+                ? null
+                : request.phCaCl2().add(new BigDecimal("0.6"));
+
         return new SoilAnalysis(
-                request.phWater(),
+                phWater,
                 request.phCaCl2(),
                 request.organicMatter(),
+                request.organicCarbon(),
                 request.phosphorus(),
                 request.potassium(),
                 request.sodium(),
@@ -87,8 +94,7 @@ public class SampleService {
                 request.baseSatReported(),
                 request.clay(),
                 request.sand(),
-                request.silt(),
-                request.ec()
+                request.silt()
         );
     }
 

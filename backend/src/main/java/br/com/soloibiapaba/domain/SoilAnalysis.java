@@ -1,3 +1,4 @@
+
 package br.com.soloibiapaba.domain;
 
 import java.math.BigDecimal;
@@ -6,6 +7,7 @@ public record SoilAnalysis(
         BigDecimal phWater,
         BigDecimal phCaCl2,
         BigDecimal organicMatter,
+        BigDecimal organicCarbon,
         BigDecimal phosphorus,
         BigDecimal potassium,
         BigDecimal sodium,
@@ -23,7 +25,6 @@ public record SoilAnalysis(
         BigDecimal baseSatReported,
         BigDecimal clay,
         BigDecimal sand,
-        BigDecimal silt,
-        BigDecimal ec
+        BigDecimal silt
 ) {
 }

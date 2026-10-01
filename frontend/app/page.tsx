@@ -445,9 +445,10 @@ export default function Home() {
                 </div>
 
                 <div className="method-note">
-                  <strong>Métodos esperados:</strong> P, K e Na por Mehlich-1; Ca, Mg e
-                  Al por KCl; H+Al por SMP ou acetato; micronutrientes conforme indicação
-                  do laboratório.
+                  <strong>Métodos esperados:</strong> P por resina; Ca, Mg e Al por
+                  KCl; K e Na conforme o método do laboratório; H+Al por SMP ou
+                  acetato; micronutrientes conforme indicação do laboratório.
+                  Informe os resultados nas unidades apresentadas em cada campo.
                 </div>
 
                 <div className="form-actions">
