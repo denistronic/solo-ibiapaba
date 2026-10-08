@@ -252,6 +252,10 @@ export default function Home() {
             gap: "0.75rem",
           }}
         >
+          <Button variant="outline" size="sm" onClick={() => router.push("/historico")}>
+              Histórico de amostras
+            </Button>
+
           {user.role === "ADMIN" && (
             <Button
               variant="outline"
