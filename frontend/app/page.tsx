@@ -69,7 +69,7 @@ function StatusPill({ level }: { level: string }) {
 
 export default function Home() {
   // NOVO (Fase 4): pega o usuário logado e a função de logout do contexto
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const sampleIdParam = searchParams.get("sample");
