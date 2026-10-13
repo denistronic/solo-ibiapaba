@@ -4,14 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ClipboardPlus,
   FlaskConical,
-  Leaf,
+  Globe,
   Printer,
   Search,
-  Sprout,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation"; // NOVO (Fase 4)
 import { useAuth } from "@/context/AuthContext"; // NOVO (Fase 4)
+import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,7 +69,7 @@ function StatusPill({ level }: { level: string }) {
 
 export default function Home() {
   // NOVO (Fase 4): pega o usuário logado e a função de logout do contexto
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const sampleIdParam = searchParams.get("sample");
@@ -240,58 +240,15 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell home-app-shell">
       <Toaster position="top-right" richColors />
 
-      <header className="topbar no-print">
-        <div className="brand-mark">
-          <Sprout size={22} />
-        </div>
-        <div>
-          <strong>Solo Ibiapaba</strong>
-          <span>Inteligência para análise de solo</span>
-        </div>
-        <div className="region-tag">
-          <Leaf size={15} /> Serra da Ibiapaba · CE
-        </div>
+      <AppHeader />
 
-        {/* NOVO (Fase 5): usuário logado, atalho de admin e botão de sair */}
-        <div
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-          }}
-        >
-          <Button variant="outline" size="sm" onClick={() => router.push("/historico")}>
-            Histórico de amostras
-          </Button>
-
-          {user.role === "ADMIN" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/admin/usuarios")}
-            >
-              Gerenciar usuários
-            </Button>
-          )}
-
-          <span style={{ fontSize: "0.875rem", color: "#6b7280" }}>
-            {user.name} · <strong>{user.role === "ADMIN" ? "Administrador" : "Usuário"}</strong>
-          </span>
-
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            Sair
-          </Button>
-        </div>
-      </header>
-
-      <div className="workspace">
-        <aside className="sidebar-panel no-print">
-          <Button className="new-button" onClick={startNewSample}>
-            <ClipboardPlus /> Nova amostragem
+      <div className="workspace home-workspace">
+        <aside className="sidebar-panel home-sidebar-panel no-print">
+          <Button className="new-button home-new-button" onClick={startNewSample}>
+            <ClipboardPlus size={19} /> Nova amostragem
           </Button>
 
           <div className="search-box">
@@ -343,7 +300,7 @@ export default function Home() {
           </p>
         </aside>
 
-        <section className="content-panel">
+        <section className="content-panel home-content-panel">
           <div className="page-intro no-print">
             <p>GESTÃO DE FERTILIDADE</p>
             <h1>{selected ? selected.code : "Nova amostragem"}</h1>
@@ -369,7 +326,7 @@ export default function Home() {
 
             <TabsContent value="cadastro" className="paper">
               <div className="section-title">
-                <ClipboardPlus />
+                <span className="home-section-icon"><Globe size={21} /></span>
                 <div>
                   <h2>Dados da coleta</h2>
                   <p>Identificação e condições da amostragem em campo.</p>
@@ -428,7 +385,7 @@ export default function Home() {
 
             <TabsContent value="analise" className="paper">
               <div className="section-title">
-                <FlaskConical />
+                <span className="home-section-icon"><FlaskConical size={21} /></span>
                 <div>
                   <h2>Resultados laboratoriais</h2>
                   <p>Informe valores e unidades exatamente conforme o método indicado.</p>
@@ -460,18 +417,18 @@ export default function Home() {
                   ))}
                 </div>
 
+                <div className="form-actions analysis-actions">
+                  <Button variant="outline" type="button" onClick={() => setTab("cadastro")}>
+                    Voltar
+                  </Button>
+                  <Button type="submit">Salvar e interpretar</Button>
+                </div>
+
                 <div className="method-note">
                   <strong>Métodos esperados:</strong> P por resina; Ca, Mg e Al por
                   KCl; K e Na conforme o método do laboratório; H+Al por SMP ou
                   acetato; micronutrientes conforme indicação do laboratório.
                   Informe os resultados nas unidades apresentadas em cada campo.
-                </div>
-
-                <div className="form-actions">
-                  <Button variant="outline" type="button" onClick={() => setTab("cadastro")}>
-                    Voltar
-                  </Button>
-                  <Button type="submit">Salvar e interpretar</Button>
                 </div>
               </form>
             </TabsContent>

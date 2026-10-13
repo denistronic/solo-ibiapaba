@@ -3,11 +3,11 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "Solo Ibiapaba",
-  description: "Cadastro, interpretação e relatório de análises de solo para a Serra da Ibiapaba.",
+  title: "SolumNutri",
+  description: "Inteligência para análise de solo: cadastro, interpretação e relatórios de fertilidade.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/solumnutri-symbol.png",
+    shortcut: "/solumnutri-symbol.png",
   },
 };
 
