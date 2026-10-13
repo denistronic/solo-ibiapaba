@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  ArrowUpDown,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
@@ -53,6 +54,7 @@ export default function HistoricoPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [page, setPage] = useState(1);
   const [preview, setPreview] = useState<Sample | null>(null);
+  const [samplePendingLaudo, setSamplePendingLaudo] = useState<Sample | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
@@ -107,7 +109,7 @@ export default function HistoricoPage() {
 
   const analyzedCount = samples.filter((sample) => sample.analysis).length;
   const pendingCount = samples.length - analyzedCount;
-  const cultureCount = new Set(samples.map((sample) => sample.crop)).size;
+  // const cultureCount = new Set(samples.map((sample) => sample.crop)).size;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -133,12 +135,58 @@ export default function HistoricoPage() {
     setSortDirection(nextKey === "sampledAt" ? "desc" : "asc");
   }
 
-  function SortButton({ label, column }: { label: string; column: SortKey }) {
+
+  function handleOpenSample(sample: Sample) {
+    if (sample.analysis) {
+      // Laudo preenchido: seguir para interpretação.
+      router.push(`/?sample=${sample.id}`);
+      return;
+    } 
+      // Laudo pendente: solicitar confirmação ao usuário.
+      setSamplePendingLaudo(sample);
+  }
+
+  function handleRegisterLaudo() {
+    if (!samplePendingLaudo) return;
+    // Redireciona para a tela principal enviando o ID da amostra para que o laudo seja preenchido lá
+    router.push(`/?sample=${samplePendingLaudo.id}`);
+
+     setSamplePendingLaudo(null);
+  }
+
+  function SortButton({
+    label,
+    column,
+  }: {
+    label: string;
+    column: SortKey;
+  }) {
     const active = sortKey === column;
+
     return (
-      <button type="button" className={`history-sort ${active ? "active" : ""}`} onClick={() => changeSort(column)}>
+      <button
+        type="button"
+        className={`history-sort ${active ? "active" : ""}`}
+        onClick={() => changeSort(column)}
+        title={`Ordenar por ${label}`}
+        aria-label={`Ordenar por ${label}${active
+          ? sortDirection === "asc"
+            ? ", ordem crescente"
+            : ", ordem decrescente"
+          : ""
+          }`}
+      >
         {label}
-        {active && (sortDirection === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+
+        {active ? (
+          sortDirection === "asc" ? (
+            <ArrowUp size={12} />
+          ) : (
+            <ArrowDown size={12} />
+          )
+        ) : (
+          <ArrowUpDown size={12} className="sort-inactive" />
+        )}
       </button>
     );
   }
@@ -175,7 +223,7 @@ export default function HistoricoPage() {
           <div><span>Total de amostras</span><strong>{samples.length}</strong><small>registros cadastrados</small></div>
           <div><span>Laudos analisados</span><strong>{analyzedCount}</strong><small>com resultados laboratoriais</small></div>
           <div><span>Aguardando laudo</span><strong>{pendingCount}</strong><small>sem análise registrada</small></div>
-          <div><span>Culturas registradas</span><strong>{cultureCount}</strong><small>tipos encontrados</small></div>
+          {/* <div><span>Culturas registradas</span><strong>{cultureCount}</strong><small>tipos encontrados</small></div> */}
         </div>
 
         <section className="history-filter-card">
@@ -184,7 +232,7 @@ export default function HistoricoPage() {
             {hasFilters && <Button variant="ghost" size="sm" onClick={clearFilters}><RotateCcw /> Limpar filtros</Button>}
           </div>
           <div className="history-filters">
-            <div className="history-search"><Search size={17} /><Input aria-label="Buscar amostra" placeholder="Código, bloco, quadra, linha ou cultura" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+            <div className="history-search"><label>Pesquisar</label><Search size={17} /><Input aria-label="Buscar amostra" placeholder="Código, bloco, quadra, linha ou cultura" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
             <div><label htmlFor="status-filter">Status</label><NativeSelect id="status-filter" value={status} onChange={(event) => setStatus(event.target.value)}><NativeSelectOption value="todos">Todos</NativeSelectOption><NativeSelectOption value="analisadas">Laudo analisado</NativeSelectOption><NativeSelectOption value="pendentes">Aguardando laudo</NativeSelectOption></NativeSelect></div>
             <div><label htmlFor="crop-filter">Cultura</label><NativeSelect id="crop-filter" value={crop} onChange={(event) => setCrop(event.target.value)}><NativeSelectOption value="todas">Todas</NativeSelectOption>{crops.map((item) => <NativeSelectOption key={item} value={item}>{item}</NativeSelectOption>)}</NativeSelect></div>
             <div><label htmlFor="block-filter">Bloco</label><NativeSelect id="block-filter" value={block} onChange={(event) => setBlock(event.target.value)}><NativeSelectOption value="todos">Todos</NativeSelectOption>{blocks.map((item) => <NativeSelectOption key={item} value={item}>Bloco {item}</NativeSelectOption>)}</NativeSelect></div>
@@ -211,7 +259,7 @@ export default function HistoricoPage() {
                     <td>{sample.crop}</td>
                     <td>{sample.depth}</td>
                     <td><span className={`history-status ${sample.analysis ? "done" : "pending"}`}>{sample.analysis ? <CheckCircle2 size={14} /> : <span className="status-dot" />}{sample.analysis ? "Laudo analisado" : "Aguardando laudo"}</span></td>
-                    <td><div className="history-actions"><Button variant="ghost" size="sm" title="Visualização rápida" onClick={() => setPreview(sample)}><Eye size={15} /> Ver</Button><Button variant="outline" size="sm" onClick={() => router.push(`/?sample=${sample.id}`)}>Abrir</Button></div></td>
+                    <td><div className="history-actions"><Button variant="ghost" size="sm" title="Visualização rápida" onClick={() => setPreview(sample)}><Eye size={15} /> Ver</Button><Button variant="outline" size="sm" onClick={() => handleOpenSample(sample)}> Abrir </Button></div></td>
                   </tr>
                 ))}
                 {!loading && !pageItems.length && <tr><td colSpan={7} className="history-empty"><strong>Nenhuma amostra encontrada.</strong><span>Tente remover alguns filtros ou usar outro termo de busca.</span>{hasFilters && <Button variant="outline" size="sm" onClick={clearFilters}>Limpar filtros</Button>}</td></tr>}
@@ -245,7 +293,77 @@ export default function HistoricoPage() {
               <div><span>Profundidade</span><strong>{preview.depth}</strong></div>
               <div><span>Temperatura</span><strong>{preview.temperature} °C</strong></div>
             </div>
-            <div className="history-modal-actions"><Button variant="outline" onClick={() => setPreview(null)}>Fechar</Button><Button onClick={() => router.push(`/?sample=${preview.id}`)}>Abrir amostra completa</Button></div>
+            <div className="history-modal-actions">
+              <Button variant="outline" onClick={() => setPreview(null)}>Fechar</Button>
+              <Button onClick={() => {
+                setPreview(null);
+                router.push(`/?sample=${encodeURIComponent(preview.id)}&view=${preview.analysis ? "relatorio" : "analise"
+                  }`
+                );
+              }}>Abrir amostra completa</Button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {samplePendingLaudo && (
+        <div
+          className="history-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSamplePendingLaudo(null);
+            }
+          }}
+        >
+          <section
+            className="history-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="laudo-modal-title"
+          >
+            <div className="history-modal-head">
+              <div>
+                <p>LAUDO PENDENTE</p>
+                <h2 id="laudo-modal-title">
+                  Registro de laudo necessário
+                </h2>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSamplePendingLaudo(null)}
+                aria-label="Fechar"
+              >
+                <X />
+              </Button>
+            </div>
+
+            <p>
+              A amostra <strong>{samplePendingLaudo.code}</strong>{" "}
+              ainda não possui um laudo registrado.
+            </p>
+
+            <p>
+              Para continuar para a tela de interpretação, é
+              necessário realizar o registro do laudo primeiro.
+            </p>
+
+            <p>Deseja registrar o laudo agora?</p>
+
+            <div className="history-modal-actions">
+              <Button
+                variant="outline"
+                onClick={() => setSamplePendingLaudo(null)}
+              >
+                Continuar no histórico
+              </Button>
+
+              <Button onClick={handleRegisterLaudo}>
+                Registrar laudo
+              </Button>
+            </div>
           </section>
         </div>
       )}

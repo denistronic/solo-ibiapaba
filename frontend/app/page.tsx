@@ -10,7 +10,7 @@ import {
   Sprout,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
-import { useRouter } from "next/navigation"; // NOVO (Fase 4)
+import { useRouter, useSearchParams } from "next/navigation"; // NOVO (Fase 4)
 import { useAuth } from "@/context/AuthContext"; // NOVO (Fase 4)
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,19 +71,8 @@ export default function Home() {
   // NOVO (Fase 4): pega o usuário logado e a função de logout do contexto
   const { user, loading: authLoading, logout } = useAuth();
   const router = useRouter();
-
-  // NOVO (Fase 4): se não estiver logado (e já terminou de checar), manda pro /login
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/login");
-    }
-  }, [authLoading, user, router]);
-
-  // NOVO (Fase 5): função chamada pelo botão "Sair"
-  function handleLogout() {
-    logout();
-    router.push("/login");
-  }
+  const searchParams = useSearchParams();
+  const sampleIdParam = searchParams.get("sample");
 
   const [samples, setSamples] = useState<Sample[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -95,6 +84,29 @@ export default function Home() {
   const [tab, setTab] = useState("cadastro");
   const [online, setOnline] = useState(false);
   const [loadingSamples, setLoadingSamples] = useState(true);
+
+  // NOVO (Fase 4): se não estiver logado (e já terminou de checar), manda pro /login
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [authLoading, user, router]);
+
+  // Seleciona automaticamente a amostra passada via parâmetro de URL (ex: vindas do histórico)
+  useEffect(() => {
+    if (sampleIdParam && samples.length > 0) {
+      const targetSample = samples.find((s) => s.id === sampleIdParam);
+      if (targetSample) {
+        void chooseSample(targetSample);
+      }
+    }
+  }, [sampleIdParam, samples]);
+
+  // NOVO (Fase 5): função chamada pelo botão "Sair"
+  function handleLogout() {
+    logout();
+    router.push("/login");
+  }
 
   const selected = samples.find((sample) => sample.id === selectedId) ?? null;
   const filtered = useMemo(
@@ -253,8 +265,8 @@ export default function Home() {
           }}
         >
           <Button variant="outline" size="sm" onClick={() => router.push("/historico")}>
-              Histórico de amostras
-            </Button>
+            Histórico de amostras
+          </Button>
 
           {user.role === "ADMIN" && (
             <Button
