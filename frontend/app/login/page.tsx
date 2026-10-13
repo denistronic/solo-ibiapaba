@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/lib/api";
+import styles from "./login.module.css";
 
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
@@ -20,7 +22,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
@@ -40,67 +42,69 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-neutral-900">
-          Solo Ibiapaba
-        </h1>
-        <p className="mb-6 text-sm text-neutral-500">
-          Entre com seu e-mail e senha
-        </p>
+    <main className={styles.screen}>
+      <section className={styles.loginCard} aria-labelledby="login-title">
+        <header className={styles.brand}>
+          <Image
+            src="/solumnutri-logo-mark.png"
+            alt=""
+            aria-hidden="true"
+            width={130}
+            height={119}
+            priority
+            className={styles.brandMark}
+          />
+          <h1 id="login-title" className={styles.brandName}>
+            SolumNutri
+          </h1>
+        </header>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-1 block text-sm font-medium text-neutral-700"
-            >
-              E-mail
-            </label>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.field}>
+            <label htmlFor="email">E-mail</label>
             <input
               id="email"
+              name="email"
               type="email"
+              autoComplete="username"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="voce@exemplo.com"
+              disabled={submitting}
             />
           </div>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="mb-1 block text-sm font-medium text-neutral-700"
-            >
-              Senha
-            </label>
+          <div className={styles.field}>
+            <label htmlFor="password">Senha</label>
             <input
               id="password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               required
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
-              placeholder="••••••••"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••••••••"
+              disabled={submitting}
             />
           </div>
 
           {error && (
-            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+            <p className={styles.error} role="alert">
               {error}
             </p>
           )}
 
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
+            disabled={submitting || loading}
+            className={styles.submitButton}
           >
             {submitting ? "Entrando..." : "Entrar"}
           </button>
         </form>
-      </div>
+      </section>
     </main>
   );
 }

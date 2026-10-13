@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/lib/api";
+import AppHeader from "@/components/AppHeader";
 import {
   createUser,
   listUsers,
@@ -12,6 +13,7 @@ import {
   type ManagedUser,
 } from "@/lib/users";
 import type { UserRole } from "@/lib/auth";
+import styles from "./usuarios.module.css";
 
 export default function AdminUsuariosPage() {
   const { user, loading: authLoading } = useAuth();
@@ -44,7 +46,8 @@ export default function AdminUsuariosPage() {
 
   useEffect(() => {
     if (user?.role === "ADMIN") {
-      void reload();
+      // Aguarda a microtask para iniciar o carregamento fora do corpo do efeito.
+      void Promise.resolve().then(() => reload());
     }
   }, [user]);
 
@@ -56,7 +59,7 @@ export default function AdminUsuariosPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  async function handleCreate(event: FormEvent) {
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreating(true);
     setCreateError(null);
@@ -129,195 +132,201 @@ export default function AdminUsuariosPage() {
 
   if (authLoading || !user || user.role !== "ADMIN") {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-neutral-500">Carregando...</p>
+      <main className={`app-shell home-app-shell ${styles.page}`}>
+        <div className="flex min-h-screen items-center justify-center">
+          <p className="text-sm text-neutral-500">Carregando...</p>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 px-4 py-8">
-      <div className="mx-auto max-w-4xl space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-neutral-900">
-            Gestão de usuários
-          </h1>
+    <main className={`app-shell home-app-shell ${styles.page}`}>
+      <AppHeader />
+
+      <div className={styles.content}>
+        <div className={styles.pageHeading}>
+          <h1>Gestão de usuários</h1>
           <button
+            type="button"
             onClick={() => router.push("/")}
-            className="text-sm text-neutral-600 underline"
+            className={styles.backButton}
           >
             Voltar
           </button>
         </div>
 
-        {/* Formulário de criação */}
-        <section className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold text-neutral-900">
+        <section className={`${styles.card} ${styles.createCard}`} aria-labelledby="new-user-title">
+          <h2 id="new-user-title" className={styles.cardTitle}>
             Novo usuário
           </h2>
 
-          <form onSubmit={handleCreate} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <form onSubmit={handleCreate} className={styles.createForm}>
             <input
               type="text"
+              name="name"
+              autoComplete="name"
               required
               placeholder="Nome"
+              aria-label="Nome"
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+              onChange={(event) => setNewName(event.target.value)}
+              className={styles.input}
             />
             <input
               type="email"
+              name="email"
+              autoComplete="email"
               required
               placeholder="E-mail"
+              aria-label="E-mail"
               value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+              onChange={(event) => setNewEmail(event.target.value)}
+              className={styles.input}
             />
             <input
               type="password"
+              name="password"
+              autoComplete="new-password"
               required
-              placeholder="Senha inicial"
+              placeholder="Senha"
+              aria-label="Senha inicial"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+              onChange={(event) => setNewPassword(event.target.value)}
+              className={styles.input}
             />
             <select
+              name="role"
+              aria-label="Perfil do usuário"
               value={newRole}
-              onChange={(e) => setNewRole(e.target.value as UserRole)}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+              onChange={(event) => setNewRole(event.target.value as UserRole)}
+              className={styles.select}
             >
               <option value="USER">Usuário</option>
               <option value="ADMIN">Administrador</option>
             </select>
 
             {createError && (
-              <p className="sm:col-span-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+              <p className={styles.createError} role="alert">
                 {createError}
               </p>
             )}
 
-            <div className="sm:col-span-2">
-              <button
-                type="submit"
-                disabled={creating}
-                className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-              >
+            <div className={styles.createActions}>
+              <button type="submit" disabled={creating} className={styles.primaryButton}>
                 {creating ? "Criando..." : "Criar usuário"}
               </button>
             </div>
           </form>
         </section>
 
-        {/* Lista de usuários */}
-        <section className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold text-neutral-900">
+        <section className={`${styles.card} ${styles.listCard}`} aria-labelledby="users-list-title">
+          <h2 id="users-list-title" className={styles.cardTitle}>
             Usuários cadastrados
           </h2>
 
-          {error && (
-            <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-              {error}
-            </p>
-          )}
-          {rowError && (
-            <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-              {rowError}
-            </p>
-          )}
+          {error && <p className={styles.errorMessage} role="alert">{error}</p>}
+          {rowError && <p className={styles.errorMessage} role="alert">{rowError}</p>}
 
-          {loadingUsers && <p className="text-sm text-neutral-500">Carregando...</p>}
+          {loadingUsers && <p className={styles.loadingMessage}>Carregando...</p>}
 
           {!loadingUsers && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
                 <thead>
-                  <tr className="border-b border-neutral-200 text-neutral-500">
-                    <th className="py-2 pr-4">Nome</th>
-                    <th className="py-2 pr-4">E-mail</th>
-                    <th className="py-2 pr-4">Perfil</th>
-                    <th className="py-2 pr-4">Status</th>
-                    <th className="py-2 pr-4">Ações</th>
+                  <tr>
+                    <th scope="col">Nome</th>
+                    <th scope="col">E-mail</th>
+                    <th scope="col">Perfil</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((target) => (
-                    <tr key={target.id} className="border-b border-neutral-100">
+                    <tr key={target.id}>
                       {editingId === target.id ? (
                         <>
-                          <td className="py-2 pr-4">
+                          <td>
                             <input
+                              aria-label={`Nome de ${target.name}`}
                               value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              className="w-full rounded-md border border-neutral-300 px-2 py-1"
+                              onChange={(event) => setEditName(event.target.value)}
+                              className={styles.tableInput}
                             />
                           </td>
-                          <td className="py-2 pr-4">
+                          <td>
                             <input
+                              aria-label={`E-mail de ${target.name}`}
+                              type="email"
                               value={editEmail}
-                              onChange={(e) => setEditEmail(e.target.value)}
-                              className="w-full rounded-md border border-neutral-300 px-2 py-1"
+                              onChange={(event) => setEditEmail(event.target.value)}
+                              className={styles.tableInput}
                             />
                           </td>
-                          <td className="py-2 pr-4">
+                          <td>
                             <select
+                              aria-label={`Perfil de ${target.name}`}
                               value={editRole}
-                              onChange={(e) => setEditRole(e.target.value as UserRole)}
-                              className="rounded-md border border-neutral-300 px-2 py-1"
+                              onChange={(event) => setEditRole(event.target.value as UserRole)}
+                              className={styles.tableSelect}
                             >
                               <option value="USER">Usuário</option>
                               <option value="ADMIN">Administrador</option>
                             </select>
                           </td>
-                          <td className="py-2 pr-4">
-                            {target.active ? "Ativo" : "Inativo"}
+                          <td>
+                            <span className={target.active ? styles.statusActive : styles.statusInactive}>
+                              {target.active ? "Ativo" : "Inativo"}
+                            </span>
                           </td>
-                          <td className="py-2 pr-4 space-x-2 whitespace-nowrap">
-                            <button
-                              onClick={() => saveEdit(target.id)}
-                              disabled={savingEdit}
-                              className="rounded-md bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
-                            >
-                              Salvar
-                            </button>
-                            <button
-                              onClick={cancelEdit}
-                              className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
-                            >
-                              Cancelar
-                            </button>
+                          <td>
+                            <div className={styles.actions}>
+                              <button
+                                type="button"
+                                onClick={() => saveEdit(target.id)}
+                                disabled={savingEdit}
+                                className={styles.actionButton}
+                              >
+                                Salvar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEdit}
+                                className={styles.actionButton}
+                              >
+                                Cancelar
+                              </button>
+                            </div>
                           </td>
                         </>
                       ) : (
                         <>
-                          <td className="py-2 pr-4">{target.name}</td>
-                          <td className="py-2 pr-4">{target.email}</td>
-                          <td className="py-2 pr-4">
-                            {target.role === "ADMIN" ? "Administrador" : "Usuário"}
-                          </td>
-                          <td className="py-2 pr-4">
-                            <span
-                              className={
-                                target.active
-                                  ? "text-green-600"
-                                  : "text-neutral-400"
-                              }
-                            >
+                          <td>{target.name}</td>
+                          <td>{target.email}</td>
+                          <td>{target.role === "ADMIN" ? "Administrador" : "Usuário"}</td>
+                          <td>
+                            <span className={target.active ? styles.statusActive : styles.statusInactive}>
                               {target.active ? "Ativo" : "Inativo"}
                             </span>
                           </td>
-                          <td className="py-2 pr-4 space-x-2 whitespace-nowrap">
-                            <button
-                              onClick={() => startEdit(target)}
-                              className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => toggleStatus(target)}
-                              className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
-                            >
-                              {target.active ? "Desativar" : "Ativar"}
-                            </button>
+                          <td>
+                            <div className={styles.actions}>
+                              <button
+                                type="button"
+                                onClick={() => startEdit(target)}
+                                className={styles.actionButton}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleStatus(target)}
+                                className={styles.actionButton}
+                              >
+                                {target.active ? "Desativar" : "Ativar"}
+                              </button>
+                            </div>
                           </td>
                         </>
                       )}
@@ -327,7 +336,7 @@ export default function AdminUsuariosPage() {
               </table>
 
               {!users.length && (
-                <p className="text-sm text-neutral-500">Nenhum usuário cadastrado.</p>
+                <p className={styles.emptyMessage}>Nenhum usuário cadastrado.</p>
               )}
             </div>
           )}
