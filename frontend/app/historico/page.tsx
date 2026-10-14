@@ -47,6 +47,7 @@ export default function HistoricoPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("todos");
   const [crop, setCrop] = useState("todas");
+  const [plot, setPlot] = useState("todas");
   const [block, setBlock] = useState("todos");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -74,10 +75,14 @@ export default function HistoricoPage() {
     void load();
   }, [user]);
 
-  useEffect(() => setPage(1), [query, status, crop, block, fromDate, toDate, sortKey, sortDirection]);
+  useEffect(() => setPage(1), [query, status, crop, plot, block, fromDate, toDate, sortKey, sortDirection]);
 
   const crops = useMemo(
     () => [...new Set(samples.map((sample) => sample.crop))].sort((a, b) => a.localeCompare(b)),
+    [samples],
+  );
+  const plots = useMemo(
+    () => [...new Set(samples.map((sample) => sample.plot))].sort((a, b) => a.localeCompare(b)),
     [samples],
   );
   const blocks = useMemo(
@@ -88,12 +93,13 @@ export default function HistoricoPage() {
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const result = samples.filter((sample) => {
-      const searchable = `${sample.code} ${sample.block} ${sample.plot} ${sample.row} ${sample.crop}`.toLowerCase();
+      const searchable = `${sample.code} ${sample.plot} ${sample.row} ${sample.crop}`.toLowerCase();
       return (
         (!normalizedQuery || searchable.includes(normalizedQuery)) &&
         (status === "todos" || (status === "analisadas" ? Boolean(sample.analysis) : !sample.analysis)) &&
         (crop === "todas" || sample.crop === crop) &&
-        (block === "todos" || sample.block === block) &&
+        (plot === "todas" || sample.plot === plot) &&
+        //(block === "todos" || sample.block === block) &&
         (!fromDate || sample.sampledAt >= fromDate) &&
         (!toDate || sample.sampledAt <= toDate)
       );
@@ -105,7 +111,7 @@ export default function HistoricoPage() {
       const comparison = first.localeCompare(second, "pt-BR", { numeric: true });
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [samples, query, status, crop, block, fromDate, toDate, sortKey, sortDirection]);
+  }, [samples, query, status, crop, plot, fromDate, toDate, sortKey, sortDirection]);
 
   const analyzedCount = samples.filter((sample) => sample.analysis).length;
   const pendingCount = samples.length - analyzedCount;
@@ -115,13 +121,14 @@ export default function HistoricoPage() {
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const startItem = filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
   const endItem = Math.min(currentPage * PAGE_SIZE, filtered.length);
-  const hasFilters = Boolean(query || status !== "todos" || crop !== "todas" || block !== "todos" || fromDate || toDate);
+  const hasFilters = Boolean(query || status !== "todos" || crop !== "todas" || plot !== "todas" || fromDate || toDate);
 
   function clearFilters() {
     setQuery("");
     setStatus("todos");
     setCrop("todas");
-    setBlock("todos");
+    setPlot("todas");
+    //setBlock("todos");
     setFromDate("");
     setToDate("");
   }
@@ -141,9 +148,9 @@ export default function HistoricoPage() {
       // Laudo preenchido: seguir para interpretação.
       router.push(`/?sample=${sample.id}`);
       return;
-    } 
-      // Laudo pendente: solicitar confirmação ao usuário.
-      setSamplePendingLaudo(sample);
+    }
+    // Laudo pendente: solicitar confirmação ao usuário.
+    setSamplePendingLaudo(sample);
   }
 
   function handleRegisterLaudo() {
@@ -151,7 +158,7 @@ export default function HistoricoPage() {
     // Redireciona para a tela principal enviando o ID da amostra para que o laudo seja preenchido lá
     router.push(`/?sample=${samplePendingLaudo.id}`);
 
-     setSamplePendingLaudo(null);
+    setSamplePendingLaudo(null);
   }
 
   function SortButton({
@@ -235,7 +242,12 @@ export default function HistoricoPage() {
             <div className="history-search"><label>Pesquisar</label><Search size={17} /><Input aria-label="Buscar amostra" placeholder="Código, bloco, quadra, linha ou cultura" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
             <div><label htmlFor="status-filter">Status</label><NativeSelect id="status-filter" value={status} onChange={(event) => setStatus(event.target.value)}><NativeSelectOption value="todos">Todos</NativeSelectOption><NativeSelectOption value="analisadas">Laudo analisado</NativeSelectOption><NativeSelectOption value="pendentes">Aguardando laudo</NativeSelectOption></NativeSelect></div>
             <div><label htmlFor="crop-filter">Cultura</label><NativeSelect id="crop-filter" value={crop} onChange={(event) => setCrop(event.target.value)}><NativeSelectOption value="todas">Todas</NativeSelectOption>{crops.map((item) => <NativeSelectOption key={item} value={item}>{item}</NativeSelectOption>)}</NativeSelect></div>
-            <div><label htmlFor="block-filter">Bloco</label><NativeSelect id="block-filter" value={block} onChange={(event) => setBlock(event.target.value)}><NativeSelectOption value="todos">Todos</NativeSelectOption>{blocks.map((item) => <NativeSelectOption key={item} value={item}>Bloco {item}</NativeSelectOption>)}</NativeSelect></div>
+            <div>
+              <label htmlFor="block-filter">Quadra</label>
+              <NativeSelect id="block-filter" value={plot} onChange={(event) => setPlot(event.target.value)}>
+                <NativeSelectOption value="todas">Todas</NativeSelectOption>{plots.map((item) => <NativeSelectOption key={item} value={item}>Quadra {item}</NativeSelectOption>)}
+              </NativeSelect>
+            </div>
             <div><label htmlFor="from-date">Coleta a partir de</label><div className="history-date"><CalendarDays size={15} /><Input id="from-date" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></div></div>
             <div><label htmlFor="to-date">Coleta até</label><div className="history-date"><CalendarDays size={15} /><Input id="to-date" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></div></div>
           </div>
