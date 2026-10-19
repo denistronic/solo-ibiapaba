@@ -4,27 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
   ArrowLeft,
+  ArrowRight,
   ArrowUp,
   ArrowUpDown,
   CalendarDays,
   CheckCircle2,
-  ClipboardList,
-  Eye,
+  ChevronDown,
   Filter,
-  Leaf,
   RotateCcw,
   Search,
-  Sprout,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import AppHeader from "@/components/AppHeader";
 import { ApiError, listSamples } from "@/lib/api";
 import type { Sample } from "@/lib/soil";
+import styles from "./historico.module.css";
 
 function formatDate(value: string) {
   return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
@@ -39,6 +36,52 @@ type SortDirection = "asc" | "desc";
 
 const PAGE_SIZE = 10;
 
+/** Cabeçalho de coluna clicável para ordenação. */
+function SortButton({
+  label,
+  column,
+  sortKey,
+  sortDirection,
+  onSort,
+}: {
+  label: string;
+  column: SortKey;
+  sortKey: SortKey;
+  sortDirection: SortDirection;
+  onSort: (column: SortKey) => void;
+}) {
+  const active = sortKey === column;
+
+  return (
+    <button
+      type="button"
+      className={`${styles.sortButton} ${active ? styles.sortActive : ""}`}
+      onClick={() => onSort(column)}
+      title={`Ordenar por ${label}`}
+      aria-label={`Ordenar por ${label}${
+        active ? (sortDirection === "asc" ? ", ordem crescente" : ", ordem decrescente") : ""
+      }`}
+    >
+      {label}
+      {active ? (
+        sortDirection === "asc" ? <ArrowUp size={16} /> : <ArrowDown size={16} />
+      ) : (
+        <ArrowUpDown size={16} className={styles.sortInactive} />
+      )}
+    </button>
+  );
+}
+
+/** Indicador de status (aguardando laudo / laudo analisado). */
+function StatusBadge({ analyzed }: { analyzed: boolean }) {
+  return (
+    <span className={`${styles.status} ${analyzed ? styles.statusDone : styles.statusPending}`}>
+      {analyzed ? <CheckCircle2 size={14} /> : <span className={styles.statusDot} />}
+      {analyzed ? "Laudo analisado" : "Aguardando laudo"}
+    </span>
+  );
+}
+
 export default function HistoricoPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -48,7 +91,6 @@ export default function HistoricoPage() {
   const [status, setStatus] = useState("todos");
   const [crop, setCrop] = useState("todas");
   const [plot, setPlot] = useState("todas");
-  const [block, setBlock] = useState("todos");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("sampledAt");
@@ -75,7 +117,20 @@ export default function HistoricoPage() {
     void load();
   }, [user]);
 
-  useEffect(() => setPage(1), [query, status, crop, plot, block, fromDate, toDate, sortKey, sortDirection]);
+  useEffect(() => setPage(1), [query, status, crop, plot, fromDate, toDate, sortKey, sortDirection]);
+
+  // Fecha os modais com a tecla Esc.
+  useEffect(() => {
+    if (!preview && !samplePendingLaudo) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPreview(null);
+        setSamplePendingLaudo(null);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [preview, samplePendingLaudo]);
 
   const crops = useMemo(
     () => [...new Set(samples.map((sample) => sample.crop))].sort((a, b) => a.localeCompare(b)),
@@ -85,21 +140,16 @@ export default function HistoricoPage() {
     () => [...new Set(samples.map((sample) => sample.plot))].sort((a, b) => a.localeCompare(b)),
     [samples],
   );
-  const blocks = useMemo(
-    () => [...new Set(samples.map((sample) => sample.block))].sort((a, b) => a.localeCompare(b)),
-    [samples],
-  );
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const result = samples.filter((sample) => {
-      const searchable = `${sample.code} ${sample.plot} ${sample.row} ${sample.crop}`.toLowerCase();
+      const searchable = `${sample.code} ${sample.block} ${sample.plot} ${sample.row} ${sample.crop}`.toLowerCase();
       return (
         (!normalizedQuery || searchable.includes(normalizedQuery)) &&
         (status === "todos" || (status === "analisadas" ? Boolean(sample.analysis) : !sample.analysis)) &&
         (crop === "todas" || sample.crop === crop) &&
         (plot === "todas" || sample.plot === plot) &&
-        //(block === "todos" || sample.block === block) &&
         (!fromDate || sample.sampledAt >= fromDate) &&
         (!toDate || sample.sampledAt <= toDate)
       );
@@ -115,7 +165,6 @@ export default function HistoricoPage() {
 
   const analyzedCount = samples.filter((sample) => sample.analysis).length;
   const pendingCount = samples.length - analyzedCount;
-  // const cultureCount = new Set(samples.map((sample) => sample.crop)).size;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -128,7 +177,6 @@ export default function HistoricoPage() {
     setStatus("todos");
     setCrop("todas");
     setPlot("todas");
-    //setBlock("todos");
     setFromDate("");
     setToDate("");
   }
@@ -142,7 +190,6 @@ export default function HistoricoPage() {
     setSortDirection(nextKey === "sampledAt" ? "desc" : "asc");
   }
 
-
   function handleOpenSample(sample: Sample) {
     if (sample.analysis) {
       // Laudo preenchido: seguir para interpretação.
@@ -155,226 +202,392 @@ export default function HistoricoPage() {
 
   function handleRegisterLaudo() {
     if (!samplePendingLaudo) return;
-    // Redireciona para a tela principal enviando o ID da amostra para que o laudo seja preenchido lá
+    // Redireciona para a tela principal enviando o ID da amostra para que o laudo seja preenchido lá.
     router.push(`/?sample=${samplePendingLaudo.id}`);
-
     setSamplePendingLaudo(null);
   }
 
-  function SortButton({
-    label,
-    column,
-  }: {
-    label: string;
-    column: SortKey;
-  }) {
-    const active = sortKey === column;
-
+  if (authLoading || !user) {
     return (
-      <button
-        type="button"
-        className={`history-sort ${active ? "active" : ""}`}
-        onClick={() => changeSort(column)}
-        title={`Ordenar por ${label}`}
-        aria-label={`Ordenar por ${label}${active
-          ? sortDirection === "asc"
-            ? ", ordem crescente"
-            : ", ordem decrescente"
-          : ""
-          }`}
-      >
-        {label}
-
-        {active ? (
-          sortDirection === "asc" ? (
-            <ArrowUp size={12} />
-          ) : (
-            <ArrowDown size={12} />
-          )
-        ) : (
-          <ArrowUpDown size={12} className="sort-inactive" />
-        )}
-      </button>
+      <main className={`app-shell home-app-shell ${styles.page}`}>
+        <div className="flex min-h-screen items-center justify-center">
+          <p className="text-sm text-neutral-500">Carregando...</p>
+        </div>
+      </main>
     );
   }
 
-  if (authLoading || !user) {
-    return <main className="flex min-h-screen items-center justify-center"><p className="text-sm text-neutral-500">Carregando...</p></main>;
-  }
+  const visiblePages = Array.from({ length: totalPages }, (_, index) => index + 1).slice(
+    Math.max(0, currentPage - 3),
+    Math.min(totalPages, currentPage + 2),
+  );
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell home-app-shell ${styles.page}`}>
       <Toaster position="top-right" richColors />
-      <header className="topbar no-print">
-        <div className="brand-mark"><Sprout size={22} /></div>
-        <div><strong>Solo Ibiapaba</strong><span>Inteligência para análise de solo</span></div>
-        <div className="region-tag"><Leaf size={15} /> Serra da Ibiapaba · CE</div>
-        <div className="history-user">
-          <span>{user.name} · <strong>{user.role === "ADMIN" ? "Administrador" : "Usuário"}</strong></span>
-          <Button variant="outline" size="sm" onClick={() => router.push("/")}>Nova amostragem</Button>
-        </div>
-      </header>
+      <AppHeader />
 
-      <section className="history-page">
-        <div className="history-header">
-          <div>
-            <Button variant="ghost" size="sm" className="back-button" onClick={() => router.push("/")}><ArrowLeft /> Voltar</Button>
-            <p>GESTÃO DE FERTILIDADE</p>
+      <div className={styles.content}>
+        {/* Cabeçalho da página */}
+        <div className={styles.pageHeading}>
+          <div className={styles.pageHeadingCopy}>
+            <p className={styles.eyebrow}>GESTÃO DE FERTILIDADE</p>
             <h1>Histórico de amostras</h1>
-            <span>Consulte, filtre e encontre rapidamente as amostragens registradas no sistema.</span>
+            <p className={styles.pageDescription}>
+              Consulte, filtre e encontre rapidamente as amostragens registradas no sistema.
+            </p>
           </div>
-          <div className="history-header-icon"><ClipboardList size={28} /></div>
+          <button type="button" className={styles.backButton} onClick={() => router.push("/")}>
+            Voltar
+          </button>
         </div>
 
-        <div className="history-summary">
-          <div><span>Total de amostras</span><strong>{samples.length}</strong><small>registros cadastrados</small></div>
-          <div><span>Laudos analisados</span><strong>{analyzedCount}</strong><small>com resultados laboratoriais</small></div>
-          <div><span>Aguardando laudo</span><strong>{pendingCount}</strong><small>sem análise registrada</small></div>
-          {/* <div><span>Culturas registradas</span><strong>{cultureCount}</strong><small>tipos encontrados</small></div> */}
-        </div>
-
-        <section className="history-filter-card">
-          <div className="history-filter-title">
-            <div className="history-filter-heading"><Filter size={18} /><div><h2>Filtrar amostras</h2><p>Combine os campos abaixo para localizar um conjunto específico de registros.</p></div></div>
-            {hasFilters && <Button variant="ghost" size="sm" onClick={clearFilters}><RotateCcw /> Limpar filtros</Button>}
+        {/* Resumo */}
+        <section className={`${styles.card} ${styles.summary}`} aria-label="Resumo das amostras">
+          <div className={styles.summaryItem}>
+            <span>Total de amostras</span>
+            <strong>{samples.length}</strong>
+            <small>registros cadastrados</small>
           </div>
-          <div className="history-filters">
-            <div className="history-search"><label>Pesquisar</label><Search size={17} /><Input aria-label="Buscar amostra" placeholder="Código, bloco, quadra, linha ou cultura" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
-            <div><label htmlFor="status-filter">Status</label><NativeSelect id="status-filter" value={status} onChange={(event) => setStatus(event.target.value)}><NativeSelectOption value="todos">Todos</NativeSelectOption><NativeSelectOption value="analisadas">Laudo analisado</NativeSelectOption><NativeSelectOption value="pendentes">Aguardando laudo</NativeSelectOption></NativeSelect></div>
-            <div><label htmlFor="crop-filter">Cultura</label><NativeSelect id="crop-filter" value={crop} onChange={(event) => setCrop(event.target.value)}><NativeSelectOption value="todas">Todas</NativeSelectOption>{crops.map((item) => <NativeSelectOption key={item} value={item}>{item}</NativeSelectOption>)}</NativeSelect></div>
-            <div>
-              <label htmlFor="block-filter">Quadra</label>
-              <NativeSelect id="block-filter" value={plot} onChange={(event) => setPlot(event.target.value)}>
-                <NativeSelectOption value="todas">Todas</NativeSelectOption>{plots.map((item) => <NativeSelectOption key={item} value={item}>Quadra {item}</NativeSelectOption>)}
-              </NativeSelect>
-            </div>
-            <div><label htmlFor="from-date">Coleta a partir de</label><div className="history-date"><CalendarDays size={15} /><Input id="from-date" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></div></div>
-            <div><label htmlFor="to-date">Coleta até</label><div className="history-date"><CalendarDays size={15} /><Input id="to-date" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></div></div>
+          <div className={styles.summaryItem}>
+            <span>Laudos analisados</span>
+            <strong>{analyzedCount}</strong>
+            <small>com resultados laboratoriais</small>
+          </div>
+          <div className={styles.summaryItem}>
+            <span>Aguardando laudo</span>
+            <strong>{pendingCount}</strong>
+            <small>sem análise registrada</small>
           </div>
         </section>
 
-        <section className="history-results">
-          <div className="history-results-heading">
-            <div><h2>Amostras encontradas</h2><span>{startItem}–{endItem} de {filtered.length} registros</span></div>
-            <div className="history-result-tools">{hasFilters && <span className="filter-active">Filtro ativo</span>}<span className="history-sort-hint">Clique no cabeçalho para ordenar</span></div>
+        {/* Filtros */}
+        <section className={`${styles.card} ${styles.filterCard}`} aria-labelledby="filter-title">
+          <div className={styles.cardHeading}>
+            <span className={styles.sectionIcon} aria-hidden="true">
+              <Filter size={22} strokeWidth={2.2} />
+            </span>
+            <h2 id="filter-title" className={styles.cardTitle}>Filtrar amostras</h2>
+            {hasFilters && (
+              <button type="button" className={styles.clearButton} onClick={clearFilters}>
+                <RotateCcw size={14} /> Limpar filtros
+              </button>
+            )}
           </div>
-          <div className="history-table-wrap">
-            <table className="history-table">
-              <thead><tr><th><SortButton label="Código" column="code" /></th><th><SortButton label="Coleta" column="sampledAt" /></th><th>Localização</th><th><SortButton label="Cultura" column="crop" /></th><th>Profundidade</th><th>Status</th><th>Ações</th></tr></thead>
+
+          <div className={styles.filters}>
+            <div className={`${styles.field} ${styles.fieldSearch}`}>
+              <label htmlFor="search-filter">Pesquisar</label>
+              <div className={styles.inputWrap}>
+                <Search size={20} className={styles.inputIcon} />
+                <input
+                  id="search-filter"
+                  className={`${styles.control} ${styles.controlWithIcon}`}
+                  placeholder="Código, bloco, quadra, linha ou cultura"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className={`${styles.field} ${styles.fieldStatus}`}>
+              <label htmlFor="status-filter">Status</label>
+              <div className={styles.inputWrap}>
+                <select
+                  id="status-filter"
+                  className={`${styles.control} ${styles.select}`}
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value)}
+                >
+                  <option value="todos">Todos</option>
+                  <option value="analisadas">Laudo analisado</option>
+                  <option value="pendentes">Aguardando laudo</option>
+                </select>
+                <ChevronDown size={20} className={styles.selectIcon} />
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="crop-filter">Cultura</label>
+              <div className={styles.inputWrap}>
+                <select
+                  id="crop-filter"
+                  className={`${styles.control} ${styles.select}`}
+                  value={crop}
+                  onChange={(event) => setCrop(event.target.value)}
+                >
+                  <option value="todas">Todas</option>
+                  {crops.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+                <ChevronDown size={20} className={styles.selectIcon} />
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="plot-filter">Quadra</label>
+              <div className={styles.inputWrap}>
+                <select
+                  id="plot-filter"
+                  className={`${styles.control} ${styles.select}`}
+                  value={plot}
+                  onChange={(event) => setPlot(event.target.value)}
+                >
+                  <option value="todas">Todas</option>
+                  {plots.map((item) => (
+                    <option key={item} value={item}>Quadra {item}</option>
+                  ))}
+                </select>
+                <ChevronDown size={20} className={styles.selectIcon} />
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="from-date">Coleta a partir de</label>
+              <div className={styles.inputWrap}>
+                <CalendarDays size={20} className={styles.inputIcon} />
+                <input
+                  id="from-date"
+                  type="date"
+                  className={`${styles.control} ${styles.controlWithIcon}`}
+                  value={fromDate}
+                  onChange={(event) => setFromDate(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="to-date">Coleta até</label>
+              <div className={styles.inputWrap}>
+                <CalendarDays size={20} className={styles.inputIcon} />
+                <input
+                  id="to-date"
+                  type="date"
+                  className={`${styles.control} ${styles.controlWithIcon}`}
+                  value={toDate}
+                  onChange={(event) => setToDate(event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Resultados */}
+        <section className={`${styles.card} ${styles.resultsCard}`} aria-labelledby="results-title">
+          <div className={styles.resultsHeading}>
+            <div>
+              <h2 id="results-title" className={styles.cardTitle}>Amostras Encontradas</h2>
+              <span className={styles.resultsCount}>
+                {startItem}–{endItem} de {filtered.length} registros
+              </span>
+            </div>
+            <div className={styles.resultsTools}>
+              {hasFilters && <span className={styles.filterActive}>Filtro ativo</span>}
+              <span className={styles.sortHint}>Clique no cabeçalho para ordenar</span>
+            </div>
+          </div>
+
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th><SortButton label="Código" column="code" sortKey={sortKey} sortDirection={sortDirection} onSort={changeSort} /></th>
+                  <th><SortButton label="Coleta" column="sampledAt" sortKey={sortKey} sortDirection={sortDirection} onSort={changeSort} /></th>
+                  <th>Localização</th>
+                  <th><SortButton label="Cultura" column="crop" sortKey={sortKey} sortDirection={sortDirection} onSort={changeSort} /></th>
+                  <th>Profundidade</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
               <tbody>
-                {loading && <tr><td colSpan={7} className="history-empty">Carregando histórico...</td></tr>}
+                {loading && (
+                  <tr><td colSpan={7} className={styles.empty}>Carregando histórico...</td></tr>
+                )}
                 {!loading && pageItems.map((sample) => (
                   <tr key={sample.id}>
-                    <td><strong className="history-code">{sample.code}</strong></td>
+                    <td><strong className={styles.code}>{sample.code}</strong></td>
                     <td>{formatDate(sample.sampledAt)}</td>
-                    <td><strong>{sample.block} · {sample.plot}</strong><small>Linha {sample.row}</small></td>
+                    <td>
+                      <span className={styles.location}>
+                        <strong>{sample.block} · {sample.plot}</strong>
+                        <small>Linha {sample.row}</small>
+                      </span>
+                    </td>
                     <td>{sample.crop}</td>
                     <td>{sample.depth}</td>
-                    <td><span className={`history-status ${sample.analysis ? "done" : "pending"}`}>{sample.analysis ? <CheckCircle2 size={14} /> : <span className="status-dot" />}{sample.analysis ? "Laudo analisado" : "Aguardando laudo"}</span></td>
-                    <td><div className="history-actions"><Button variant="ghost" size="sm" title="Visualização rápida" onClick={() => setPreview(sample)}><Eye size={15} /> Ver</Button><Button variant="outline" size="sm" onClick={() => handleOpenSample(sample)}> Abrir </Button></div></td>
+                    <td><StatusBadge analyzed={Boolean(sample.analysis)} /></td>
+                    <td>
+                      <div className={styles.actions}>
+                        <button
+                          type="button"
+                          className={styles.actionButton}
+                          title="Visualização rápida"
+                          onClick={() => setPreview(sample)}
+                        >
+                          Ver
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.actionButton}
+                          onClick={() => handleOpenSample(sample)}
+                        >
+                          Abrir
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
-                {!loading && !pageItems.length && <tr><td colSpan={7} className="history-empty"><strong>Nenhuma amostra encontrada.</strong><span>Tente remover alguns filtros ou usar outro termo de busca.</span>{hasFilters && <Button variant="outline" size="sm" onClick={clearFilters}>Limpar filtros</Button>}</td></tr>}
+                {!loading && !pageItems.length && (
+                  <tr>
+                    <td colSpan={7} className={styles.empty}>
+                      <strong>Nenhuma amostra encontrada.</strong>
+                      <span>Tente remover alguns filtros ou usar outro termo de busca.</span>
+                      {hasFilters && (
+                        <button type="button" className={styles.actionButton} onClick={clearFilters}>
+                          Limpar filtros
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
+
           {!loading && filtered.length > 0 && (
-            <div className="history-pagination">
-              <span>Mostrando <strong>{startItem}–{endItem}</strong> de <strong>{filtered.length}</strong></span>
-              <div>
-                <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setPage((value) => value - 1)}>Anterior</Button>
-                {Array.from({ length: totalPages }, (_, index) => index + 1).slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2)).map((item) => <Button key={item} variant={item === currentPage ? "default" : "outline"} size="sm" onClick={() => setPage(item)}>{item}</Button>)}
-                <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setPage((value) => value + 1)}>Próxima</Button>
+            <div className={styles.pagination}>
+              <span>Mostrando {startItem}–{endItem} de {filtered.length}</span>
+              <div className={styles.pager}>
+                <button
+                  type="button"
+                  className={styles.pagerArrow}
+                  disabled={currentPage === 1}
+                  onClick={() => setPage((value) => value - 1)}
+                  aria-label="Página anterior"
+                >
+                  <ArrowLeft size={22} />
+                </button>
+                {visiblePages.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`${styles.pagerPage} ${item === currentPage ? styles.pagerPageActive : ""}`}
+                    onClick={() => setPage(item)}
+                    aria-current={item === currentPage ? "page" : undefined}
+                  >
+                    {item}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={styles.pagerArrow}
+                  disabled={currentPage === totalPages}
+                  onClick={() => setPage((value) => value + 1)}
+                  aria-label="Próxima página"
+                >
+                  <ArrowRight size={22} />
+                </button>
               </div>
             </div>
           )}
         </section>
-      </section>
+      </div>
 
+      {/* Modal: visualização rápida */}
       {preview && (
-        <div className="history-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null); }}>
-          <section className="history-modal" role="dialog" aria-modal="true" aria-labelledby="sample-preview-title">
-            <div className="history-modal-head"><div><p>VISUALIZAÇÃO RÁPIDA</p><h2 id="sample-preview-title">Amostra {preview.code}</h2></div><Button variant="ghost" size="sm" onClick={() => setPreview(null)} aria-label="Fechar"><X /></Button></div>
-            <div className="history-preview-status"><span className={`history-status ${preview.analysis ? "done" : "pending"}`}>{preview.analysis ? <CheckCircle2 size={14} /> : <span className="status-dot" />}{preview.analysis ? "Laudo analisado" : "Aguardando laudo"}</span></div>
-            <div className="history-preview-grid">
-              <div><span>Data da coleta</span><strong>{formatDate(preview.sampledAt)}</strong></div>
-              <div><span>Cultura</span><strong>{preview.crop}</strong></div>
-              <div><span>Bloco</span><strong>{preview.block}</strong></div>
-              <div><span>Quadra</span><strong>{preview.plot}</strong></div>
-              <div><span>Linha</span><strong>{preview.row}</strong></div>
-              <div><span>Profundidade</span><strong>{preview.depth}</strong></div>
-              <div><span>Temperatura</span><strong>{preview.temperature} °C</strong></div>
+        <div
+          className={styles.backdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setPreview(null);
+          }}
+        >
+          <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="sample-preview-title">
+            <div className={styles.modalHead}>
+              <div>
+                <p>VISUALIZAÇÃO RÁPIDA</p>
+                <h2 id="sample-preview-title">Amostra {preview.code}</h2>
+              </div>
+              <button type="button" className={styles.closeButton} onClick={() => setPreview(null)} aria-label="Fechar">
+                <X size={22} />
+              </button>
             </div>
-            <div className="history-modal-actions">
-              <Button variant="outline" onClick={() => setPreview(null)}>Fechar</Button>
-              <Button onClick={() => {
-                setPreview(null);
-                router.push(`/?sample=${encodeURIComponent(preview.id)}&view=${preview.analysis ? "relatorio" : "analise"
-                  }`
-                );
-              }}>Abrir amostra completa</Button>
+
+            <div className={styles.modalBody}>
+              <div className={styles.previewStatus}>
+                <StatusBadge analyzed={Boolean(preview.analysis)} />
+              </div>
+              <div className={styles.previewGrid}>
+                <div><span>Data da coleta</span><strong>{formatDate(preview.sampledAt)}</strong></div>
+                <div><span>Cultura</span><strong>{preview.crop}</strong></div>
+                <div><span>Bloco</span><strong>{preview.block}</strong></div>
+                <div><span>Quadra</span><strong>{preview.plot}</strong></div>
+                <div><span>Linha</span><strong>{preview.row}</strong></div>
+                <div><span>Profundidade</span><strong>{preview.depth}</strong></div>
+                <div><span>Temperatura</span><strong>{preview.temperature} °C</strong></div>
+              </div>
+            </div>
+
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.secondaryButton} onClick={() => setPreview(null)}>
+                Fechar
+              </button>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => {
+                  setPreview(null);
+                  router.push(
+                    `/?sample=${encodeURIComponent(preview.id)}&view=${preview.analysis ? "relatorio" : "analise"}`,
+                  );
+                }}
+              >
+                Abrir amostra completa
+              </button>
             </div>
           </section>
         </div>
       )}
 
+      {/* Modal: laudo pendente */}
       {samplePendingLaudo && (
         <div
-          className="history-modal-backdrop"
+          className={styles.backdrop}
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setSamplePendingLaudo(null);
-            }
+            if (event.target === event.currentTarget) setSamplePendingLaudo(null);
           }}
         >
-          <section
-            className="history-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="laudo-modal-title"
-          >
-            <div className="history-modal-head">
+          <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="laudo-modal-title">
+            <div className={styles.modalHead}>
               <div>
                 <p>LAUDO PENDENTE</p>
-                <h2 id="laudo-modal-title">
-                  Registro de laudo necessário
-                </h2>
+                <h2 id="laudo-modal-title">Registro de laudo necessário</h2>
               </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSamplePendingLaudo(null)}
-                aria-label="Fechar"
-              >
-                <X />
-              </Button>
+              <button type="button" className={styles.closeButton} onClick={() => setSamplePendingLaudo(null)} aria-label="Fechar">
+                <X size={22} />
+              </button>
             </div>
 
-            <p>
-              A amostra <strong>{samplePendingLaudo.code}</strong>{" "}
-              ainda não possui um laudo registrado.
-            </p>
+            <div className={`${styles.modalBody} ${styles.modalText}`}>
+              <p>
+                A amostra <strong>{samplePendingLaudo.code}</strong> ainda não possui um laudo registrado.
+              </p>
+              <p>
+                Para continuar para a tela de interpretação, é necessário realizar o registro do laudo primeiro.
+              </p>
+              <p>Deseja registrar o laudo agora?</p>
+            </div>
 
-            <p>
-              Para continuar para a tela de interpretação, é
-              necessário realizar o registro do laudo primeiro.
-            </p>
-
-            <p>Deseja registrar o laudo agora?</p>
-
-            <div className="history-modal-actions">
-              <Button
-                variant="outline"
-                onClick={() => setSamplePendingLaudo(null)}
-              >
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.secondaryButton} onClick={() => setSamplePendingLaudo(null)}>
                 Continuar no histórico
-              </Button>
-
-              <Button onClick={handleRegisterLaudo}>
+              </button>
+              <button type="button" className={styles.primaryButton} onClick={handleRegisterLaudo}>
                 Registrar laudo
-              </Button>
+              </button>
             </div>
           </section>
         </div>

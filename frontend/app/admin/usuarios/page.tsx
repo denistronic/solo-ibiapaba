@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { UserRoundPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/lib/api";
@@ -146,7 +147,13 @@ export default function AdminUsuariosPage() {
 
       <div className={styles.content}>
         <div className={styles.pageHeading}>
-          <h1>Gestão de usuários</h1>
+          <div className={styles.pageHeadingCopy}>
+            <p className={styles.eyebrow}>GESTÃO DE FERTILIDADE</p>
+            <h1>Gerenciamento de usuários</h1>
+            <p className={styles.pageDescription}>
+              Cadastre, consulte e edite os usuários do sistema.
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => router.push("/")}
@@ -157,9 +164,14 @@ export default function AdminUsuariosPage() {
         </div>
 
         <section className={`${styles.card} ${styles.createCard}`} aria-labelledby="new-user-title">
-          <h2 id="new-user-title" className={styles.cardTitle}>
-            Novo usuário
-          </h2>
+          <div className={styles.cardHeading}>
+            <span className={styles.sectionIcon} aria-hidden="true">
+              <UserRoundPlus size={22} strokeWidth={2.2} />
+            </span>
+            <h2 id="new-user-title" className={styles.cardTitle}>
+              Novo usuário
+            </h2>
+          </div>
 
           <form onSubmit={handleCreate} className={styles.createForm}>
             <input

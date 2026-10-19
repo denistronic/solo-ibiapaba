@@ -301,9 +301,9 @@ export default function Home() {
         </aside>
 
         <section className="content-panel home-content-panel">
-          <div className="page-intro no-print">
+          <div className="page-intro no-print ds-page-heading">
             <p>GESTÃO DE FERTILIDADE</p>
-            <h1>{selected ? selected.code : "Nova amostragem"}</h1>
+            <h1>{selected ? selected.code : "Nova Amostragem"}</h1>
             <span>
               {selected
                 ? `${selected.crop} · Bloco ${selected.block} · Quadra ${selected.plot}`
@@ -324,7 +324,7 @@ export default function Home() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="cadastro" className="paper">
+            <TabsContent value="cadastro" className="paper ds-panel">
               <div className="section-title">
                 <span className="home-section-icon"><Globe size={21} /></span>
                 <div>
@@ -377,13 +377,13 @@ export default function Home() {
                   </NativeSelect>
                 </div>
 
-                <div className="form-actions">
-                  <Button type="submit">Gerar número e salvar</Button>
+                <div className="form-actions sampling-actions">
+                  <Button type="submit">Gerar amostra e salvar</Button>
                 </div>
               </form>
             </TabsContent>
 
-            <TabsContent value="analise" className="paper">
+            <TabsContent value="analise" className="paper ds-panel">
               <div className="section-title">
                 <span className="home-section-icon"><FlaskConical size={21} /></span>
                 <div>
@@ -415,13 +415,13 @@ export default function Home() {
                       </div>
                     </div>
                   ))}
-                </div>
 
-                <div className="form-actions analysis-actions">
-                  <Button variant="outline" type="button" onClick={() => setTab("cadastro")}>
-                    Voltar
-                  </Button>
-                  <Button type="submit">Salvar e interpretar</Button>
+                  <div className="form-actions analysis-actions">
+                    <Button variant="outline" type="button" onClick={() => setTab("cadastro")}>
+                      Voltar
+                    </Button>
+                    <Button type="submit">Salvar e interpretar</Button>
+                  </div>
                 </div>
 
                 <div className="method-note">
@@ -433,7 +433,7 @@ export default function Home() {
               </form>
             </TabsContent>
 
-            <TabsContent value="relatorio" className="report-page">
+            <TabsContent value="relatorio" className="report-page ds-panel">
               {selected && reportLoading && (
                 <p className="empty-copy">Gerando interpretação no backend Java...</p>
               )}
@@ -462,6 +462,14 @@ export default function Home() {
                     >
                       <Printer /> Imprimir
                     </Button>
+                    <div className="print-brand" aria-hidden="true">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/solumnutri-symbol.png" alt="" width={38} height={35} />
+                      <div>
+                        <strong>SolumNutri</strong>
+                        <span>Inteligência para análise de solo</span>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="summary-strip">
