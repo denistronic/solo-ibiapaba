@@ -11,7 +11,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SoilInterpretationServiceTest {
 
-    private final SoilInterpretationService service = new SoilInterpretationService();
+    private final SoilInterpretationService service = new SoilInterpretationService(new InterpretationParameterService(
+            (br.com.soloibiapaba.repository.InterpretationParameterRepository) java.lang.reflect.Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class[]{br.com.soloibiapaba.repository.InterpretationParameterRepository.class},
+                    (proxy, method, args) -> List.of())));
 
     @Test
     void shouldCalculateDerivedValuesUsingMmolcPerDm3() {
@@ -22,7 +25,7 @@ class SoilInterpretationServiceTest {
                 "70", "62.86", "350", "500", "150"
         );
 
-        SoilReportResponse report = service.analyze(analysis);
+        SoilReportResponse report = service.analyze(analysis, "Acerola");
 
         assertThat(report.derived())
                 .extracting(item -> item.label() + "=" + item.value())
@@ -61,7 +64,7 @@ class SoilInterpretationServiceTest {
                 "54", "81.48", "350", "500", "150"
         );
 
-        SoilReportResponse report = service.analyze(analysis);
+        SoilReportResponse report = service.analyze(analysis, "Acerola");
 
         assertThat(report.summary())
                 .extracting(item -> item.label() + "=" + item.value())
@@ -80,7 +83,7 @@ class SoilInterpretationServiceTest {
                 "3", "1", "30", "10", "0.1", "10",
                 "0.008", "0.0004", "0.0008", "0.025", "0.008", "0.001",
                 "54", "81.48", "350", "500", "150"
-        ));
+        ), "Acerola");
 
         List<String> indicators = report.indicators()
                 .stream()
@@ -88,21 +91,21 @@ class SoilInterpretationServiceTest {
                 .toList();
 
         assertThat(indicators).contains(
-                "Carbono orgânico total=15.00 g/dm³ [Informativo]",
-                "Fósforo (P) — Resina=0.02 g/dm³ [Informativo]",
-                "Cálcio (Ca)=30.00 mmolc/dm³ [Médio]",
-                "Magnésio (Mg)=10.00 mmolc/dm³ [Médio]",
-                "Potássio (K)=3.00 mmolc/dm³ [Médio]",
-                "Sódio (Na)=1.00 mmolc/dm³ [Informativo]",
-                "Alumínio total (Al)=0.10 mmolc/dm³ [Baixo]",
-                "Acidez total (H+Al)=10.00 mmolc/dm³ [Informativo]",
-                "CTC informada pelo laboratório=54.00 mmolc/dm³ [Informativo]",
-                "Enxofre (S)=0.008 g/dm³ [Médio]",
-                "Boro (B)=0.0004 g/dm³ [Médio]",
-                "Ferro (Fe)=0.025 g/dm³ [Informativo]",
-                "Argila=350.00 g/kg [Informativo]",
-                "Silte=150.00 g/kg [Informativo]",
-                "Areia total=500.00 g/kg [Informativo]"
+                "Carbono orgânico total=15.00 g/dm³ [Não configurado]",
+                "Fósforo (P) — Resina=0.02 g/dm³ [Não configurado]",
+                "Cálcio (Ca)=30.00 mmolc/dm³ [Não configurado]",
+                "Magnésio (Mg)=10.00 mmolc/dm³ [Não configurado]",
+                "Potássio (K)=3.00 mmolc/dm³ [Não configurado]",
+                "Sódio (Na)=1.00 mmolc/dm³ [Não configurado]",
+                "Alumínio total (Al)=0.1 mmolc/dm³ [Não configurado]",
+                "Acidez total (H+Al)=10.00 mmolc/dm³ [Não configurado]",
+                "CTC informada pelo laboratório=54.00 mmolc/dm³ [Não configurado]",
+                "Enxofre (S)=0.008 g/dm³ [Não configurado]",
+                "Boro (B)=0.0004 g/dm³ [Não configurado]",
+                "Ferro (Fe)=0.025 g/dm³ [Não configurado]",
+                "Argila=350.00 g/kg [Não configurado]",
+                "Silte=150.00 g/kg [Não configurado]",
+                "Areia total=500.00 g/kg [Não configurado]"
         );
 
         assertThat(indicators)
@@ -119,7 +122,7 @@ class SoilInterpretationServiceTest {
                 "54", "81.48", "350", "500", "150"
         );
 
-        SoilReportResponse report = service.analyze(analysis);
+        SoilReportResponse report = service.analyze(analysis, "Acerola");
 
         assertThat(report.insights()).hasSize(1);
         assertThat(report.insights().getFirst().title())

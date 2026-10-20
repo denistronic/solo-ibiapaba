@@ -65,6 +65,6 @@ public class SampleController {
         if (sample.analysis() == null) {
             throw new AnalysisNotFoundException(id);
         }
-        return interpretationService.analyze(sample.analysis());
+        return interpretationService.analyze(sample.analysis(), sample.crop());
     }
 }

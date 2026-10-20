@@ -485,6 +485,9 @@ export default function Home() {
                   <div className="report-grid">
                     <section>
                       <h3>Interpretação dos indicadores</h3>
+                      <p>Classificação conforme os parâmetros atuais cadastrados para a cultura da amostra.
+                        <a className="no-print" href="/parametros-interpretacao"> Configurar parâmetros</a>
+                      </p>
                       <table>
                         <thead>
                           <tr>
