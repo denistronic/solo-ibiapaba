@@ -1,0 +1,18 @@
+.page { min-height:100vh; background:var(--cor-fundo); color:var(--cor-texto); font-family:var(--fonte-principal); }
+.content { width:min(1100px,calc(100% - 40px)); margin:32px auto 64px; line-height:1.6; }
+.heading { display:flex; justify-content:space-between; align-items:center; gap:20px; flex-wrap:wrap; }
+.heading h1 { font-size:var(--tamanho-titulo-pagina); font-weight:750; }
+.card { background:var(--cor-branco,#fff); padding:24px; border:1px solid var(--cor-borda,#ddd); border-radius:12px; margin:24px 0; }
+.card h2 { font-size:20px; font-weight:700; margin-bottom:18px; }
+.culture { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
+.card input { border:1px solid var(--cor-borda,#bbb); border-radius:6px; padding:9px 12px; background:var(--cor-branco,#fff); color:inherit; min-height:42px; }
+.card input:focus-visible { outline:2px solid var(--cor-primaria,#167d55); outline-offset:2px; }
+.rules { background:var(--cor-branco,#fff); padding:16px; border-left:4px solid var(--cor-primaria,#167d55); }
+.tableWrap { overflow-x:auto; }
+.tableWrap table { width:100%; border-collapse:collapse; text-align:left; }
+.tableWrap th,.tableWrap td { padding:12px 8px; border-bottom:1px solid var(--cor-borda,#ddd); }
+.tableWrap tbody th { font-weight:500; min-width:210px; }
+.tableWrap input { width:140px; }
+.actions { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:24px; }
+.error { padding:14px; background:#fff0ef; color:#9c2424; border-radius:6px; }
+.success { padding:14px; background:#e8f6ed; color:#175c34; border-radius:6px; }

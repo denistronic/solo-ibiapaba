@@ -11,6 +11,9 @@ import java.util.Locale;
 
 @Service
 public class SoilInterpretationService {
+    private final InterpretationParameterService parameters;
+    public SoilInterpretationService(InterpretationParameterService parameters) { this.parameters = parameters; }
+
 
     /**
      * Produz os indicadores e cálculos derivados do laudo.
@@ -20,13 +23,11 @@ public class SoilInterpretationService {
      * - matéria orgânica, carbono orgânico e nutrientes: g/dm³;
      * - argila, silte e areia: g/kg.
      *
-     * Observação: as faixas convertidas abaixo preservam matematicamente as
-     * faixas que já existiam no MVP. Elas devem ser validadas pelo responsável
-     * técnico para a cultura, região e método do laboratório antes de serem
-     * usadas como recomendação agronômica. Fósforo por resina, carbono orgânico
-     * total e ferro são exibidos como informativos, sem classificação automática.
+     * A classificação dos indicadores utiliza os limites cadastrados por cultura.
      */
-    public SoilReportResponse analyze(SoilAnalysis analysis) {
+    public SoilReportResponse analyze(SoilAnalysis analysis, String crop) {
+        analysis = SoilUnits.normalize(analysis);
+        var ranges = parameters.ranges(crop);
         // O pH em água é derivado do pH em CaCl2 conforme orientação do laboratório.
         // O cálculo aqui também protege relatórios antigos/entradas sem phWater.
         double phWater = analysis.phCaCl2() != null
@@ -57,71 +58,63 @@ public class SoilInterpretationService {
         double caK = potassium != 0.0 ? calcium / potassium : 0.0;
         double mgK = potassium != 0.0 ? magnesium / potassium : 0.0;
 
+        BigDecimal indicatorPh = analysis.phCaCl2() != null
+                ? analysis.phCaCl2().add(new BigDecimal("0.6")) : analysis.phWater();
+        boolean hasBases = analysis.calcium() != null && analysis.magnesium() != null
+                && analysis.potassium() != null && analysis.sodium() != null;
+        BigDecimal indicatorV = hasBases && analysis.hAl() != null && cecAtPh7 != 0.0
+                ? BigDecimal.valueOf(baseSaturation) : null;
+        BigDecimal indicatorM = hasBases && analysis.aluminum() != null && effectiveCec != 0.0
+                ? BigDecimal.valueOf(aluminumSaturation) : null;
+
         List<SoilReportResponse.SummaryItem> summary = List.of(
                 new SoilReportResponse.SummaryItem(
                         "pH em água (calculado)",
                         phWater > 0.0 ? oneDecimal(phWater) : "—",
-                        phWater > 0.0 ? classify(phWater, 5.5, 6.5) : "Sem dado"
+                        InterpretationParameterService.classify(indicatorPh, ranges.get("pH em água (calculado)"))
                 ),
                 new SoilReportResponse.SummaryItem(
                         "V%",
-                        fmt(baseSaturation, "%"),
-                        classify(baseSaturation, 40, 70)
+                        indicatorV == null ? "—" : fmt(baseSaturation, "%"),
+                        InterpretationParameterService.classify(indicatorV, ranges.get("Saturação por bases"))
                 ),
                 new SoilReportResponse.SummaryItem(
                         "m%",
-                        fmt(aluminumSaturation, "%"),
-                        aluminumSaturation < 10
-                                ? "Baixo"
-                                : aluminumSaturation <= 30 ? "Médio" : "Alto"
+                        indicatorM == null ? "—" : fmt(aluminumSaturation, "%"),
+                        InterpretationParameterService.classify(indicatorM, ranges.get("Saturação por alumínio"))
                 ),
                 new SoilReportResponse.SummaryItem(
                         "CTC pH 7",
                         fmt(cecAtPh7, "mmolc/dm³"),
-                        classify(cecAtPh7, 43, 86)
+                        "Informativo"
                 )
         );
 
         List<SoilReportResponse.IndicatorItem> indicators = new ArrayList<>();
 
-        // Indicadores com faixas antigas convertidas para as unidades novas.
-        addIndicator(indicators, "pH em água (calculado)", phWater, 5.5, 6.5, "");
-        addIndicator(indicators, "Matéria orgânica", n(analysis.organicMatter()), 15, 30, "g/dm³");
-
-        // O fósforo passou de Mehlich-1 para resina: não reutilizar as faixas antigas.
-        addInformativeIndicator(indicators, "Carbono orgânico total", analysis.organicCarbon(), "g/dm³");
-        addInformativeIndicator(indicators, "Fósforo (P) — Resina", analysis.phosphorus(), "g/dm³");
-
-        // Conversões dos cátions para mmolc/dm³.
-        // Ca: 1,5–4 cmolc/dm³ -> 15–40 mmolc/dm³.
-        // Mg: 0,5–1,5 cmolc/dm³ -> 5–15 mmolc/dm³.
-        // Al: 0,2–0,5 cmolc/dm³ -> 2–5 mmolc/dm³.
-        // K: 45–120 mg/dm³ -> aproximadamente 1,15–3,07 mmolc/dm³.
-        addIndicator(indicators, "Potássio (K)", potassium, 1.15, 3.07, "mmolc/dm³");
-        addInformativeIndicator(indicators, "Sódio (Na)", analysis.sodium(), "mmolc/dm³");
-        addIndicator(indicators, "Cálcio (Ca)", calcium, 15, 40, "mmolc/dm³");
-        addIndicator(indicators, "Magnésio (Mg)", magnesium, 5, 15, "mmolc/dm³");
-        addIndicator(indicators, "Alumínio total (Al)", aluminum, 2, 5, "mmolc/dm³");
-        addInformativeIndicator(indicators, "Acidez total (H+Al)", analysis.hAl(), "mmolc/dm³");
-        addInformativeIndicator(indicators, "CTC informada pelo laboratório", analysis.cecReported(), "mmolc/dm³");
-        addInformativeIndicator(indicators, "V informado pelo laboratório", analysis.baseSatReported(), "%");
-
-        addIndicator(indicators, "Saturação por bases", baseSaturation, 40, 70, "%");
-        addIndicator(indicators, "Saturação por alumínio", aluminumSaturation, 10, 30, "%");
-
-        // Conversão das faixas de mg/dm³ para g/dm³ (divisão por 1.000).
-        // Confirmar essas faixas com o responsável técnico antes do uso operacional.
-        addIndicator(indicators, "Enxofre (S)", n(analysis.sulfur()), 0.005, 0.010, "g/dm³");
-        addIndicator(indicators, "Boro (B)", n(analysis.boron()), 0.0002, 0.0006, "g/dm³");
-        addIndicator(indicators, "Cobre (Cu)", n(analysis.copper()), 0.0004, 0.0012, "g/dm³");
-        addInformativeIndicator(indicators, "Ferro (Fe)", analysis.iron(), "g/dm³");
-        addIndicator(indicators, "Manganês (Mn)", n(analysis.manganese()), 0.005, 0.012, "g/dm³");
-        addIndicator(indicators, "Zinco (Zn)", n(analysis.zinc()), 0.0006, 0.0015, "g/dm³");
-
-        // Textura do solo é registrada em g/kg, sem classificação automática.
-        addInformativeIndicator(indicators, "Argila", analysis.clay(), "g/kg");
-        addInformativeIndicator(indicators, "Silte", analysis.silt(), "g/kg");
-        addInformativeIndicator(indicators, "Areia total", analysis.sand(), "g/kg");
+        addConfiguredIndicator(indicators, ranges, "pH em água (calculado)", indicatorPh, "");
+        addConfiguredIndicator(indicators, ranges, "Matéria orgânica", analysis.organicMatter(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Carbono orgânico total", analysis.organicCarbon(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Fósforo (P) — " + (analysis.phosphorusMethod() == null ? "Resina" : analysis.phosphorusMethod()), analysis.phosphorus(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Potássio (K)", analysis.potassium(), "mmolc/dm³");
+        addConfiguredIndicator(indicators, ranges, "Sódio (Na)", analysis.sodium(), "mmolc/dm³");
+        addConfiguredIndicator(indicators, ranges, "Cálcio (Ca)", analysis.calcium(), "mmolc/dm³");
+        addConfiguredIndicator(indicators, ranges, "Magnésio (Mg)", analysis.magnesium(), "mmolc/dm³");
+        addConfiguredIndicator(indicators, ranges, "Alumínio total (Al)", analysis.aluminum(), "mmolc/dm³");
+        addConfiguredIndicator(indicators, ranges, "Acidez total (H+Al)", analysis.hAl(), "mmolc/dm³");
+        addConfiguredIndicator(indicators, ranges, "CTC informada pelo laboratório", analysis.cecReported(), "mmolc/dm³");
+        addConfiguredIndicator(indicators, ranges, "V informado pelo laboratório", analysis.baseSatReported(), "%");
+        addConfiguredIndicator(indicators, ranges, "Saturação por bases", indicatorV, "%");
+        addConfiguredIndicator(indicators, ranges, "Saturação por alumínio", indicatorM, "%");
+        addConfiguredIndicator(indicators, ranges, "Enxofre (S)", analysis.sulfur(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Boro (B)", analysis.boron(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Cobre (Cu)", analysis.copper(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Ferro (Fe)", analysis.iron(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Manganês (Mn)", analysis.manganese(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Zinco (Zn)", analysis.zinc(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Argila", analysis.clay(), "g/kg");
+        addConfiguredIndicator(indicators, ranges, "Silte", analysis.silt(), "g/kg");
+        addConfiguredIndicator(indicators, ranges, "Areia total", analysis.sand(), "g/kg");
 
         List<SoilReportResponse.InsightItem> insights = new ArrayList<>();
 
@@ -194,50 +187,16 @@ public class SoilInterpretationService {
         return new SoilReportResponse(summary, List.copyOf(indicators), List.copyOf(insights), derived);
     }
 
-    private void addIndicator(
-            List<SoilReportResponse.IndicatorItem> indicators,
-            String label,
-            double value,
-            double low,
-            double high,
-            String unit) {
-
-        if (value > 0.0) {
-            indicators.add(new SoilReportResponse.IndicatorItem(
-                    label,
-                    fmt(value, unit),
-                    classify(value, low, high)
-            ));
-        }
-    }
-
-    private void addInformativeIndicator(
-            List<SoilReportResponse.IndicatorItem> indicators,
-            String label,
-            BigDecimal value,
-            String unit) {
-
-        if (value != null) {
-            indicators.add(new SoilReportResponse.IndicatorItem(
-                    label,
-                    fmt(value.doubleValue(), unit),
-                    "Informativo"
-            ));
-        }
+    private void addConfiguredIndicator(List<SoilReportResponse.IndicatorItem> indicators,
+            java.util.Map<String, InterpretationParameterService.Range> ranges,
+            String label, BigDecimal value, String unit) {
+        indicators.add(new SoilReportResponse.IndicatorItem(label,
+                value == null ? "—" : fmt(value.doubleValue(), unit),
+                InterpretationParameterService.classify(value, ranges.get(label))));
     }
 
     private double n(BigDecimal value) {
         return value == null ? 0.0 : value.doubleValue();
-    }
-
-    private String classify(double value, double low, double high) {
-        if (value < low) {
-            return "Baixo";
-        }
-        if (value > high) {
-            return "Alto";
-        }
-        return "Médio";
     }
 
     private String fmt(double value, String unit) {
@@ -250,7 +209,9 @@ public class SoilInterpretationService {
             int decimals = Math.abs(value) >= 1.0 ? 2 : 6;
             number = String.format(Locale.ROOT, "%." + decimals + "f", value).trim();
             if (Math.abs(value) < 1.0 && number.indexOf('.') >= 0) {
-                number = number.replaceAll("0+$", "").replaceAll("\\.$", "");
+                while (number.endsWith("0") && number.length() - number.indexOf('.') > 3) {
+                    number = number.substring(0, number.length() - 1);
+                }
             }
         }
         return unit == null || unit.isBlank() ? number : number + " " + unit;

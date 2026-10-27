@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { History, LogOut, UsersRound } from "lucide-react";
+import { History, LogOut, UsersRound, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 
@@ -47,6 +47,9 @@ export default function AppHeader() {
           onClick={() => router.push("/historico")}
         >
           <History size={22} />
+        </Button>
+        <Button variant="outline" title="Parâmetros de interpretação" onClick={() => router.push("/parametros-interpretacao")}>
+          <SlidersHorizontal size={18} /> Parâmetros
         </Button>
         {user.role === "ADMIN" && (
           <Button

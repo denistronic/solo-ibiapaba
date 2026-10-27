@@ -1234,3 +1234,15 @@ veis */
     transform: none !important;
   }
 }
+
+/* Unidades do laudo: mantém os componentes e a identidade do formulário. */
+.analysis-field > div { flex-wrap: wrap; }
+.analysis-field [data-slot="native-select-wrapper"] { flex: 0 0 auto; max-width: 100%; }
+.analysis-field [data-slot="native-select"] { min-width: 122px; height: 40px; }
+#density-help { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+
+/* Campo opcional abaixo da temperatura em Nova amostragem. */
+.home-content-panel .form-grid .sample-observations { grid-column: 1 / -1; }
+.home-content-panel .sample-observations textarea { width: 100%; min-height: 88px; resize: vertical; }
+.home-content-panel .sample-observations p { margin: 5px 0 0; color: var(--muted); font-size: 12px; text-align: right; }
+.sample-observations-text { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -10,6 +10,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record CreateSampleRequest(
+        @NotBlank(message = "Número da OS é obrigatório")
+        @jakarta.validation.constraints.Pattern(regexp = "[0-9]{8}", message = "Número da OS deve conter exatamente 8 dígitos numéricos")
+        String serviceOrderNumber,
+
         @NotBlank(message = "Bloco é obrigatório")
         @Size(max = 80, message = "Bloco deve ter no máximo 80 caracteres")
         String block,
@@ -36,6 +40,9 @@ public record CreateSampleRequest(
 
         @NotBlank(message = "Profundidade é obrigatória")
         @Size(max = 40, message = "Profundidade deve ter no máximo 40 caracteres")
-        String depth
+        String depth,
+
+        @Size(max = 250, message = "Observações devem ter no máximo 250 caracteres")
+        String observations
 ) {
 }

@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext"; // NOVO (Fase 4)
 import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   NativeSelect,
@@ -35,18 +36,21 @@ import {
 } from "@/lib/api";
 import {
   ANALYSIS_FIELDS,
+  analysisUnitOptions,
   type Sample,
   type SoilAnalysis,
   type SoilReport,
 } from "@/lib/soil";
 
 const makeEmptyMeta = () => ({
+  serviceOrderNumber: "",
   block: "",
   plot: "",
   row: "",
   crop: "Acerola",
   sampledAt: new Date().toISOString().slice(0, 10),
   temperature: "",
+  observations: "",
   depth: "0–20 cm",
 });
 
@@ -112,7 +116,7 @@ export default function Home() {
   const filtered = useMemo(
     () =>
       samples.filter((sample) =>
-        `${sample.code} ${sample.block} ${sample.plot} ${sample.crop}`
+        `${sample.code} ${sample.serviceOrderNumber ?? ""} ${sample.block} ${sample.plot} ${sample.crop}`
           .toLowerCase()
           .includes(query.toLowerCase()),
       ),
@@ -182,12 +186,23 @@ export default function Home() {
     event.preventDefault();
     if (!selectedId) return;
 
-    const numeric = Object.fromEntries(
-      Object.entries(analysis).map(([key, value]) => [
-        key,
-        value === "" || value === null ? null : Number(value),
-      ]),
-    ) as SoilAnalysis;
+    const units = analysis.units ?? {};
+    const needsDensity = ANALYSIS_FIELDS.some((field) =>
+      field.unit === "g/dm³" && units[field.key]?.endsWith("/kg") &&
+      analysis[field.key] !== "" && analysis[field.key] != null,
+    );
+    if (needsDensity && !(Number(analysis.density) > 0)) {
+      toast.error("Informe a densidade de conversão para resultados por massa (g/kg ou mg/kg).");
+      return;
+    }
+    const numeric = {
+      ...Object.fromEntries(ANALYSIS_FIELDS.map(({ key }) => [
+        key, analysis[key] === "" || analysis[key] == null ? null : Number(analysis[key]),
+      ])),
+      units,
+      density: analysis.density === "" || analysis.density == null ? null : Number(analysis.density),
+      phosphorusMethod: analysis.phosphorusMethod ?? "Resina",
+    } as SoilAnalysis;
 
     try {
       const updated = await updateAnalysis(selectedId, numeric);
@@ -277,6 +292,7 @@ export default function Home() {
                   className={`sample-card ${selectedId === sample.id ? "selected" : ""}`}
                 >
                   <span className="sample-code">{sample.code}</span>
+                  {sample.serviceOrderNumber && <span>OS {sample.serviceOrderNumber}</span>}
                   <strong>
                     {sample.block} · {sample.plot}
                   </strong>
@@ -334,6 +350,16 @@ export default function Home() {
               </div>
 
               <form onSubmit={createSample} className="form-grid">
+                <div className="field">
+                  <Label htmlFor="serviceOrderNumber">Número da OS</Label>
+                  <Input id="serviceOrderNumber" name="serviceOrderNumber" type="text"
+                    inputMode="numeric" pattern="[0-9]{8}" minLength={8} maxLength={8}
+                    required placeholder="Ex.: 00123456" value={meta.serviceOrderNumber}
+                    title="Informe exatamente 8 dígitos numéricos"
+                    aria-describedby="service-order-help"
+                    onChange={(event) => setMeta({ ...meta, serviceOrderNumber: event.target.value })} />
+                  <p id="service-order-help">Informe os 8 dígitos da ordem de serviço, incluindo zeros à esquerda.</p>
+                </div>
                 {[
                   ["Bloco", "block", "Ex.: C"],
                   ["Quadra", "plot", "Ex.: Q12"],
@@ -363,6 +389,21 @@ export default function Home() {
                     />
                   </div>
                 ))}
+
+                <div className="field sample-observations">
+                  <Label htmlFor="observations">Observações</Label>
+                  <Textarea
+                    id="observations"
+                    name="observations"
+                    rows={3}
+                    maxLength={250}
+                    placeholder="Informações adicionais sobre a coleta (opcional)"
+                    value={meta.observations}
+                    aria-describedby="observations-count"
+                    onChange={(event) => setMeta({ ...meta, observations: event.target.value })}
+                  />
+                  <p id="observations-count">{meta.observations.length}/250 caracteres</p>
+                </div>
 
                 <div className="field">
                   <Label htmlFor="depth">Profundidade</Label>
@@ -411,12 +452,44 @@ export default function Home() {
                             })
                           }
                         />
-                        <span>{field.unit}</span>
+                        {analysisUnitOptions(field.unit).length > 0 ? (
+                          <NativeSelect
+                            aria-label={`Unidade de ${field.label}`}
+                            value={analysis.units?.[field.key] ?? field.unit}
+                            onChange={(event) => setAnalysis({
+                              ...analysis,
+                              units: { ...analysis.units, [field.key]: event.target.value },
+                            })}
+                          >
+                            {analysisUnitOptions(field.unit).map((unit) => (
+                              <NativeSelectOption key={unit} value={unit}>{unit}</NativeSelectOption>
+                            ))}
+                          </NativeSelect>
+                        ) : <span>{field.unit}</span>}
                       </div>
                     </div>
                   ))}
                 </div>
 
+                <div className="analysis-grid">
+                  <div className="field">
+                    <Label htmlFor="phosphorusMethod">Extrator de fósforo</Label>
+                    <NativeSelect id="phosphorusMethod" value={analysis.phosphorusMethod ?? "Resina"}
+                      onChange={(event) => setAnalysis({ ...analysis, phosphorusMethod: event.target.value })}>
+                      {["Resina", "Mehlich 1", "Não informado"].map((method) => (
+                        <NativeSelectOption key={method} value={method}>{method}</NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                  <div className="field">
+                    <Label htmlFor="density">Densidade de conversão (kg/dm³)</Label>
+                    <Input id="density" type="number" min="0" step="any"
+                      value={analysis.density ?? ""}
+                      onChange={(event) => setAnalysis({ ...analysis, density: event.target.value })}
+                      aria-describedby="density-help" />
+                    <p id="density-help">Necessária para converter g/kg ou mg/kg em g/dm³. Use a relação massa/volume validada para o método do laboratório.</p>
+                  </div>
+                </div>
                 <div className="form-actions analysis-actions">
                   <Button variant="outline" type="button" onClick={() => setTab("cadastro")}>
                     Voltar
@@ -425,10 +498,10 @@ export default function Home() {
                 </div>
 
                 <div className="method-note">
-                  <strong>Métodos esperados:</strong> P por resina; Ca, Mg e Al por
+                  <strong>Métodos esperados:</strong> P conforme o extrator selecionado; Ca, Mg e Al por
                   KCl; K e Na conforme o método do laboratório; H+Al por SMP ou
                   acetato; micronutrientes conforme indicação do laboratório.
-                  Informe os resultados nas unidades apresentadas em cada campo.
+                  Selecione a unidade original de cada resultado. Os cálculos usam mmolc/dm³, g/dm³ e g/kg. Alterar a unidade não altera o número digitado; confira ambos conforme o laudo.
                 </div>
               </form>
             </TabsContent>
@@ -450,6 +523,7 @@ export default function Home() {
                     <div>
                       <p>RELATÓRIO DE INTERPRETAÇÃO</p>
                       <h2>{selected.code}</h2>
+                      {selected.serviceOrderNumber && <p>OS {selected.serviceOrderNumber}</p>}
                       <span>
                         {selected.crop} · {selected.block}/{selected.plot}/{selected.row} ·{" "}
                         {selected.depth}
@@ -464,6 +538,10 @@ export default function Home() {
                     </Button>
                   </div>
 
+                  {selected.observations && (
+                    <p className="sample-observations-text"><strong>Observações:</strong> {selected.observations}</p>
+                  )}
+
                   <div className="summary-strip">
                     {report.summary.map((item) => (
                       <div key={item.label}>
@@ -477,6 +555,9 @@ export default function Home() {
                   <div className="report-grid">
                     <section>
                       <h3>Interpretação dos indicadores</h3>
+                      <p>Classificação conforme os parâmetros atuais cadastrados para a cultura da amostra.
+                        <a className="no-print" href="/parametros-interpretacao"> Configurar parâmetros</a>
+                      </p>
                       <table>
                         <thead>
                           <tr>

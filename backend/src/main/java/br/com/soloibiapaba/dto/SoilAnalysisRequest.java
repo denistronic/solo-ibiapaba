@@ -74,6 +74,10 @@ public record SoilAnalysisRequest(
 
         @DecimalMin(value = "0.0", message = "Silte não pode ser negativo")
         @DecimalMax(value = "1000.0", message = "Silte não pode ser maior que 1000")
-        BigDecimal silt
+        BigDecimal silt,
+        java.util.Map<String, String> units,
+        @DecimalMin(value = "0.0", inclusive = false, message = "Densidade deve ser maior que zero")
+        BigDecimal density,
+        String phosphorusMethod
 ) {
 }

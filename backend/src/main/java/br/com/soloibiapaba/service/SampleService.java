@@ -44,6 +44,7 @@ public class SampleService {
         var sample = new Sample(
                 UUID.randomUUID(),
                 code,
+                request.serviceOrderNumber(),
                 normalize(request.block()),
                 normalize(request.plot()),
                 normalize(request.row()),
@@ -53,7 +54,8 @@ public class SampleService {
                 normalize(request.depth()),
                 Instant.now(clock),
                 null,
-                null
+                null,
+                normalize(request.observations())
         );
 
         return repository.save(sample);
@@ -72,7 +74,7 @@ public class SampleService {
                 ? null
                 : request.phCaCl2().add(new BigDecimal("0.6"));
 
-        return new SoilAnalysis(
+        SoilAnalysis analysis = new SoilAnalysis(
                 phWater,
                 request.phCaCl2(),
                 request.organicMatter(),
@@ -94,8 +96,13 @@ public class SampleService {
                 request.baseSatReported(),
                 request.clay(),
                 request.sand(),
-                request.silt()
+                request.silt(),
+                request.units(),
+                request.density(),
+                request.phosphorusMethod()
         );
+        SoilUnits.normalize(analysis);
+        return analysis;
     }
 
     private String normalize(String value) {
