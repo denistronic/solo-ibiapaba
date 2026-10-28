@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/api/health").permitAll()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/interpretation-parameters", "/api/interpretation-parameters/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/interpretation-parameters", "/api/interpretation-parameters/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 

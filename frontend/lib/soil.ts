@@ -1,14 +1,20 @@
-export type SoilAnalysis = Record<string, number | string | null>;
+export type SoilAnalysis = Record<string, number | string | null | Record<string, string>> & {
+  units?: Record<string, string>;
+  density?: number | string | null;
+  phosphorusMethod?: string;
+};
 
 export type Sample = {
   id: string;
   code: string;
+  serviceOrderNumber?: string | null;
   block: string;
   plot: string;
   row: string;
   crop: string;
   sampledAt: string;
   temperature: string | null;
+  observations?: string | null;
   depth: string;
   createdAt: string;
   analysis?: SoilAnalysis | null;
@@ -28,7 +34,7 @@ export const ANALYSIS_FIELDS = [
 
   { key: "organicMatter", label: "Matéria orgânica", unit: "g/dm³" },
   { key: "organicCarbon", label: "Carbono orgânico total", unit: "g/dm³" },
-  { key: "phosphorus", label: "Fósforo (P) — Resina", unit: "g/dm³" },
+  { key: "phosphorus", label: "Fósforo (P)", unit: "g/dm³" },
 
   { key: "calcium", label: "Cálcio (Ca)", unit: "mmolc/dm³" },
   { key: "magnesium", label: "Magnésio (Mg)", unit: "mmolc/dm³" },
@@ -51,3 +57,10 @@ export const ANALYSIS_FIELDS = [
   { key: "silt", label: "Silte", unit: "g/kg" },
   { key: "sand", label: "Areia total", unit: "g/kg" },
 ] as const;
+
+export function analysisUnitOptions(unit: string): string[] {
+  if (unit === "mmolc/dm³") return ["mmolc/dm³", "cmolc/dm³"];
+  if (unit === "g/dm³") return ["g/dm³", "mg/dm³", "g/kg", "mg/kg"];
+  if (unit === "g/kg") return ["g/kg", "%"];
+  return [];
+}

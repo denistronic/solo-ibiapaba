@@ -8,6 +8,7 @@ import java.util.UUID;
 public record Sample(
         UUID id,
         String code,
+        String serviceOrderNumber,
         String block,
         String plot,
         String row,
@@ -17,12 +18,14 @@ public record Sample(
         String depth,
         Instant createdAt,
         SoilAnalysis analysis,
-        Instant analysisUpdatedAt
+        Instant analysisUpdatedAt,
+        String observations
 ) {
     public Sample withAnalysis(SoilAnalysis newAnalysis, Instant updatedAt) {
         return new Sample(
                 id,
                 code,
+                serviceOrderNumber,
                 block,
                 plot,
                 row,
@@ -32,7 +35,8 @@ public record Sample(
                 depth,
                 createdAt,
                 newAnalysis,
-                updatedAt
+                updatedAt,
+                observations
         );
     }
 }

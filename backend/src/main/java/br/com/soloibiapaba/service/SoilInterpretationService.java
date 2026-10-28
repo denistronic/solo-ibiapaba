@@ -26,6 +26,7 @@ public class SoilInterpretationService {
      * A classificação dos indicadores utiliza os limites cadastrados por cultura.
      */
     public SoilReportResponse analyze(SoilAnalysis analysis, String crop) {
+        analysis = SoilUnits.normalize(analysis);
         var ranges = parameters.ranges(crop);
         // O pH em água é derivado do pH em CaCl2 conforme orientação do laboratório.
         // O cálculo aqui também protege relatórios antigos/entradas sem phWater.
@@ -94,7 +95,7 @@ public class SoilInterpretationService {
         addConfiguredIndicator(indicators, ranges, "pH em água (calculado)", indicatorPh, "");
         addConfiguredIndicator(indicators, ranges, "Matéria orgânica", analysis.organicMatter(), "g/dm³");
         addConfiguredIndicator(indicators, ranges, "Carbono orgânico total", analysis.organicCarbon(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Fósforo (P) — Resina", analysis.phosphorus(), "g/dm³");
+        addConfiguredIndicator(indicators, ranges, "Fósforo (P) — " + (analysis.phosphorusMethod() == null ? "Resina" : analysis.phosphorusMethod()), analysis.phosphorus(), "g/dm³");
         addConfiguredIndicator(indicators, ranges, "Potássio (K)", analysis.potassium(), "mmolc/dm³");
         addConfiguredIndicator(indicators, ranges, "Sódio (Na)", analysis.sodium(), "mmolc/dm³");
         addConfiguredIndicator(indicators, ranges, "Cálcio (Ca)", analysis.calcium(), "mmolc/dm³");
@@ -208,7 +209,9 @@ public class SoilInterpretationService {
             int decimals = Math.abs(value) >= 1.0 ? 2 : 6;
             number = String.format(Locale.ROOT, "%." + decimals + "f", value).trim();
             if (Math.abs(value) < 1.0 && number.indexOf('.') >= 0) {
-                number = number.replaceAll("0+$", "").replaceAll("\\.$", "");
+                while (number.endsWith("0") && number.length() - number.indexOf('.') > 3) {
+                    number = number.substring(0, number.length() - 1);
+                }
             }
         }
         return unit == null || unit.isBlank() ? number : number + " " + unit;

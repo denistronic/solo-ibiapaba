@@ -48,8 +48,15 @@ export default function AppHeader() {
         >
           <History size={22} />
         </Button>
-        <Button variant="outline" title="Parâmetros de interpretação" onClick={() => router.push("/parametros-interpretacao")}>
-          <SlidersHorizontal size={18} /> Parâmetros
+        <Button
+          className="home-icon-button"
+          variant="outline"
+          size="icon"
+          aria-label="Parâmetros de interpretação"
+          title="Parâmetros de interpretação"
+          onClick={() => router.push("/parametros-interpretacao")}
+        >
+          <SlidersHorizontal size={22} />
         </Button>
         {user.role === "ADMIN" && (
           <Button

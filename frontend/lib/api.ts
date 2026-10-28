@@ -77,12 +77,14 @@ export function getSample(id: string) {
 }
 
 export function createSample(payload: {
+  serviceOrderNumber: string;
   block: string;
   plot: string;
   row: string;
   crop: string;
   sampledAt: string;
   temperature: number;
+  observations?: string;
   depth: string;
 }) {
   return request<Sample>("/samples", {

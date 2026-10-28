@@ -97,7 +97,7 @@ class SoilInterpretationServiceTest {
                 "Magnésio (Mg)=10.00 mmolc/dm³ [Não configurado]",
                 "Potássio (K)=3.00 mmolc/dm³ [Não configurado]",
                 "Sódio (Na)=1.00 mmolc/dm³ [Não configurado]",
-                "Alumínio total (Al)=0.1 mmolc/dm³ [Não configurado]",
+                "Alumínio total (Al)=0.10 mmolc/dm³ [Não configurado]",
                 "Acidez total (H+Al)=10.00 mmolc/dm³ [Não configurado]",
                 "CTC informada pelo laboratório=54.00 mmolc/dm³ [Não configurado]",
                 "Enxofre (S)=0.008 g/dm³ [Não configurado]",
