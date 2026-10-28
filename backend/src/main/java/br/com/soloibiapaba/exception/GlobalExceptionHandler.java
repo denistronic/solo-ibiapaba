@@ -95,6 +95,12 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidParameter(
+            IllegalArgumentException exception, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, exception.getMessage(), request.getRequestURI(), Map.of());
+    }
+
     private ResponseEntity<ApiErrorResponse> build(
             HttpStatus status,
             String message,

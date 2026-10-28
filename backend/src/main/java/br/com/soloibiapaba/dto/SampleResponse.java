@@ -10,6 +10,7 @@ import java.util.UUID;
 public record SampleResponse(
         UUID id,
         String code,
+        String serviceOrderNumber,
         String block,
         String plot,
         String row,
@@ -19,12 +20,14 @@ public record SampleResponse(
         String depth,
         Instant createdAt,
         SoilAnalysis analysis,
-        Instant analysisUpdatedAt
+        Instant analysisUpdatedAt,
+        String observations
 ) {
     public static SampleResponse from(Sample sample) {
         return new SampleResponse(
                 sample.id(),
                 sample.code(),
+                sample.serviceOrderNumber(),
                 sample.block(),
                 sample.plot(),
                 sample.row(),
@@ -34,7 +37,8 @@ public record SampleResponse(
                 sample.depth(),
                 sample.createdAt(),
                 sample.analysis(),
-                sample.analysisUpdatedAt()
+                sample.analysisUpdatedAt(),
+                sample.observations()
         );
     }
 }

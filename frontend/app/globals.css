@@ -64,7 +64,7 @@
   --cor-foco-forte: color-mix(in srgb, var(--cor-secundaria) 36%, transparent);
 
   /* Tipografia e medidas compartilhadas. */
-  --fonte-principal: Inter, "Segoe UI", Arial, sans-serif;
+  --fonte-principal: var(--font-inter, Inter), "Segoe UI", Arial, sans-serif;
   --fonte-monospace: ui-monospace, SFMono-Regular, Consolas, monospace;
   --tamanho-titulo-pagina: 35px;
   --tamanho-titulo-secao: 17px;
@@ -1642,4 +1642,758 @@ body { font-size: var(--tamanho-corpo); line-height: 1.5; }
     margin-top: 16px;
     break-inside: avoid;
   }
+}
+
+/* Unidades do laudo: mantém os componentes e a identidade do formulário. */
+.analysis-field > div { flex-wrap: wrap; }
+.analysis-field [data-slot="native-select-wrapper"] { flex: 0 0 auto; max-width: 100%; }
+.analysis-field [data-slot="native-select"] { min-width: 122px; height: 40px; }
+#density-help { font-size: 12px; color: var(--cor-texto-secundario); line-height: 1.5; }
+
+/* Campo opcional abaixo da temperatura em Nova amostragem. */
+.home-content-panel .form-grid .sample-observations { grid-column: 1 / -1; }
+.home-content-panel .sample-observations textarea { width: 100%; min-height: 88px; resize: vertical; }
+.sample-observations-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Hovers dos ícones do header compartilhado em todas as páginas. */
+.topbar.home-topbar .home-icon-button {
+  cursor: pointer !important;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease !important;
+}
+
+.topbar.home-topbar .home-icon-button:not(:disabled):hover {
+  border-color: var(--cor-secundaria) !important;
+  background: var(--cor-branco-alpha-10) !important;
+  color: var(--cor-branco) !important;
+  box-shadow: 0 2px 7px var(--cor-sombra-sutil) !important;
+  transform: translateY(-1px) !important;
+}
+
+.topbar.home-topbar .home-icon-button:not(:disabled):active {
+  background: var(--cor-branco-alpha-08) !important;
+  transform: translateY(0) !important;
+  box-shadow: none !important;
+}
+
+.topbar.home-topbar .home-icon-button:focus-visible {
+  outline: 3px solid var(--cor-secundaria) !important;
+  outline-offset: 3px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar.home-topbar .home-icon-button {
+    transition: none !important;
+  }
+}
+
+
+/* Ajustes da tela inicial conforme o layout de referência SolumNutri. */
+.home-content-panel .form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: stretch;
+  column-gap: 16px !important;
+  row-gap: 18px !important;
+}
+
+.home-content-panel .form-grid > .field-serviceOrderNumber {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+}
+
+.home-content-panel .form-grid > .field-block {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+}
+
+.home-content-panel .form-grid > .field-plot {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+}
+
+.home-content-panel .form-grid > .field-row {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+}
+
+.home-content-panel .form-grid > .field-sampledAt {
+  grid-column: 1 !important;
+  grid-row: 3 !important;
+}
+
+.home-content-panel .form-grid > .field-temperature {
+  grid-column: 2 !important;
+  grid-row: 3 !important;
+}
+
+.home-content-panel .form-grid > .field-crop {
+  grid-column: 1 !important;
+  grid-row: 4 !important;
+}
+
+.home-content-panel .form-grid > .field-depth {
+  grid-column: 2 !important;
+  grid-row: 4 !important;
+}
+
+.home-content-panel .form-grid > .sample-observations {
+  grid-column: 3 !important;
+  /* A caixa cobre exatamente as três primeiras linhas e termina alinhada
+     à base do campo Temperatura, sem reservar espaço para contador. */
+  grid-row: 1 / span 3 !important;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+}
+
+.home-content-panel .sample-observations textarea {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  resize: vertical;
+  border: 1px solid var(--cor-borda) !important;
+  border-radius: var(--raio-controle) !important;
+  background: var(--cor-branco) !important;
+  color: var(--cor-texto) !important;
+  font-size: 14px !important;
+  box-shadow: none !important;
+}
+
+.home-content-panel .form-grid > .sampling-actions {
+  grid-column: 3 !important;
+  grid-row: 4 !important;
+  min-height: 40px !important;
+  align-self: end !important;
+  align-items: flex-end !important;
+  justify-content: flex-end !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+.home-content-panel .field-label-with-help {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.home-content-panel .field-label-with-help label {
+  margin: 0 !important;
+}
+
+.home-content-panel .field-help-trigger {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  color: var(--cor-texto-secundario);
+  cursor: help;
+  outline: none;
+}
+
+.home-content-panel .field-help-trigger:hover,
+.home-content-panel .field-help-trigger:focus-visible {
+  color: var(--cor-primaria);
+}
+
+.home-content-panel .field-help-trigger:focus-visible {
+  outline: 2px solid var(--cor-secundaria);
+  outline-offset: 3px;
+}
+
+.home-content-panel .field-tooltip {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  left: 0;
+  width: max-content;
+  max-width: min(270px, calc(100vw - 36px));
+  padding: 9px 11px;
+  border: 1px solid var(--cor-secundaria);
+  border-radius: 8px;
+  background: var(--cor-primaria);
+  color: var(--cor-branco);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  white-space: normal;
+  box-shadow: 0 8px 22px var(--cor-sombra-modal);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+}
+
+.home-content-panel .field-help-trigger:hover .field-tooltip,
+.home-content-panel .field-help-trigger:focus .field-tooltip,
+.home-content-panel .field-help-trigger:focus-visible .field-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.home-sidebar-panel .sample-card-heading {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.home-sidebar-panel .sample-card .sample-code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cor-primaria) !important;
+  font-family: var(--fonte-principal) !important;
+  font-size: 12px !important;
+  font-weight: 750 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-sidebar-panel .sample-card .sample-order {
+  flex: 0 0 auto;
+  color: var(--cor-texto-secundario) !important;
+  font-size: 11px !important;
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) and (min-width: 581px) {
+  .home-content-panel .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .home-content-panel .form-grid > .field-serviceOrderNumber,
+  .home-content-panel .form-grid > .field-block,
+  .home-content-panel .form-grid > .field-plot,
+  .home-content-panel .form-grid > .field-row,
+  .home-content-panel .form-grid > .field-sampledAt,
+  .home-content-panel .form-grid > .field-temperature,
+  .home-content-panel .form-grid > .field-crop,
+  .home-content-panel .form-grid > .field-depth {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+
+  .home-content-panel .form-grid > .sample-observations,
+  .home-content-panel .form-grid > .sampling-actions {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+  }
+
+  .home-content-panel .sample-observations textarea {
+    flex: 0 0 auto;
+    height: 120px !important;
+    min-height: 120px !important;
+  }
+
+  .home-content-panel .form-grid > .sampling-actions {
+    justify-content: flex-end !important;
+  }
+}
+
+@media (max-width: 580px) {
+  .home-content-panel .form-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .home-content-panel .form-grid > .field-serviceOrderNumber,
+  .home-content-panel .form-grid > .field-block,
+  .home-content-panel .form-grid > .field-plot,
+  .home-content-panel .form-grid > .field-row,
+  .home-content-panel .form-grid > .field-sampledAt,
+  .home-content-panel .form-grid > .field-temperature,
+  .home-content-panel .form-grid > .field-crop,
+  .home-content-panel .form-grid > .field-depth,
+  .home-content-panel .form-grid > .sample-observations,
+  .home-content-panel .form-grid > .sampling-actions {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+
+  .home-content-panel .sample-observations textarea {
+    flex: 0 0 auto;
+    height: 120px !important;
+    min-height: 120px !important;
+  }
+
+  .home-content-panel .form-grid > .sampling-actions button {
+    width: 100%;
+  }
+
+  .home-content-panel .field-tooltip {
+    left: auto;
+    right: -12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-content-panel .field-tooltip {
+    transition: none;
+  }
+}
+
+
+/* Layout atualizado da etapa 02 — Laudo: campos e unidades alinhados lado a lado. */
+.home-content-panel .analysis-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  column-gap: 16px !important;
+  row-gap: 18px !important;
+  align-items: end !important;
+}
+
+.home-content-panel .analysis-field {
+  min-width: 0;
+}
+
+.home-content-panel .analysis-field > div:last-child {
+  position: relative;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  width: 100%;
+  min-width: 0;
+  gap: 0;
+}
+
+.home-content-panel .analysis-field > div:last-child > input {
+  flex: 1 1 0% !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 100%;
+  padding-right: 12px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.home-content-panel .analysis-field [data-slot="native-select-wrapper"] {
+  flex: 0 1 42% !important;
+  width: 42% !important;
+  max-width: 42% !important;
+  min-width: 0 !important;
+}
+
+.home-content-panel .analysis-field [data-slot="native-select"] {
+  display: block;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100%;
+  height: 40px !important;
+  padding-left: 8px !important;
+  padding-right: 24px !important;
+  border: 1px solid var(--cor-borda) !important;
+  border-left: 0 !important;
+  border-radius: 0 var(--raio-controle) var(--raio-controle) 0 !important;
+  background: var(--cor-superficie) !important;
+  color: var(--cor-texto) !important;
+  font-size: 12px !important;
+  box-shadow: none !important;
+}
+
+.home-content-panel .analysis-field > div:last-child > span {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  transform: translateY(-50%);
+  z-index: 2;
+  font-size: 10px;
+  color: var(--cor-texto-secundario);
+  background: var(--cor-branco);
+  pointer-events: none;
+}
+
+.home-content-panel .analysis-field #phCaCl2 {
+  padding-right: 42px !important;
+  border-radius: var(--raio-controle) !important;
+}
+
+.home-content-panel .analysis-field #baseSatReported {
+  padding-right: 30px !important;
+  border-radius: var(--raio-controle) !important;
+}
+
+.home-content-panel .form-actions.analysis-actions {
+  grid-column: 4 !important;
+  grid-row: 6 !important;
+  align-self: end !important;
+  justify-self: stretch;
+  min-width: 0;
+  min-height: 40px !important;
+  margin: 0 0 0 !important;
+  padding: 0 !important;
+}
+
+.home-content-panel .form-actions.analysis-actions button {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  font-size: 12px !important;
+}
+
+@media (max-width: 1100px) and (min-width: 581px) {
+  .home-content-panel .analysis-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .home-content-panel .form-actions.analysis-actions {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+    justify-content: flex-end !important;
+  }
+}
+
+@media (max-width: 580px) {
+  .home-content-panel .analysis-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .home-content-panel .analysis-field [data-slot="native-select-wrapper"] {
+    flex-basis: 42% !important;
+    width: 42% !important;
+    max-width: 42% !important;
+  }
+
+  .home-content-panel .form-actions.analysis-actions {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+    justify-content: flex-end !important;
+    flex-wrap: wrap;
+  }
+}
+
+
+/* Correções visuais finais da etapa 02 — Laudo. */
+/* Os seletores de unidade usam o cinza da paleta; o extrator fica branco. */
+.home-content-panel .analysis-field [data-slot="native-select"] {
+  background: var(--cor-borda) !important;
+}
+
+.home-content-panel .analysis-field-phosphorus-method > div:last-child {
+  display: block !important;
+  width: 100% !important;
+}
+
+.home-content-panel .analysis-field-phosphorus-method [data-slot="native-select-wrapper"] {
+  display: block !important;
+  flex: 1 1 100% !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.home-content-panel .analysis-field-phosphorus-method [data-slot="native-select"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  border: 1px solid var(--cor-borda) !important;
+  border-radius: var(--raio-controle) !important;
+  background: var(--cor-branco) !important;
+  padding-left: 12px !important;
+  padding-right: 36px !important;
+}
+
+/* Mantém o ícone de ajuda alinhado à linha do rótulo. */
+.home-content-panel .analysis-field .field-label-with-help {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  width: max-content;
+  max-width: 100%;
+  min-height: 17px;
+  margin-bottom: 7px !important;
+}
+
+.home-content-panel .analysis-field .field-label-with-help > label {
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+
+.home-content-panel .analysis-field .field-label-with-help .field-help-trigger {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  display: inline-flex !important;
+  flex: 0 0 17px !important;
+  align-self: center !important;
+  transform: translateY(-1px);
+  color: var(--cor-texto-secundario) !important;
+}
+
+/* O seletor por ID tinha precedência sobre o texto branco do tooltip. */
+#density-help {
+  color: var(--cor-branco) !important;
+  background: var(--cor-primaria) !important;
+}
+
+/* Os dois botões dividem igualmente a largura de um campo. */
+.home-content-panel .form-actions.analysis-actions {
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.home-content-panel .form-actions.analysis-actions button {
+  flex: 1 1 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  height: 42px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  white-space: nowrap !important;
+  font-size: 12px !important;
+}
+
+@media (max-width: 580px) {
+  .home-content-panel .form-actions.analysis-actions button {
+    flex: 1 1 0 !important;
+    width: 0 !important;
+  }
+}
+
+/* Ajustes finais da etapa 02 — tooltip de densidade acima dos campos adjacentes. */
+.home-content-panel .analysis-field-density {
+  position: relative !important;
+  z-index: 100 !important;
+}
+
+.home-content-panel .analysis-field-density .field-help-trigger {
+  z-index: 101 !important;
+}
+
+.home-content-panel .analysis-field-density .field-tooltip {
+  z-index: 1000 !important;
+}
+
+/* O botão Voltar fica menor; Salvar e interpretar ocupa o espaço restante. */
+.home-content-panel .form-actions.analysis-actions .analysis-back-button {
+  flex: 0 0 34% !important;
+  width: auto !important;
+  min-width: 76px !important;
+}
+
+.home-content-panel .form-actions.analysis-actions button:not(.analysis-back-button) {
+  flex: 1 1 0 !important;
+  width: auto !important;
+}
+
+
+
+/* ===== Etapa 03 · Interpretação — layout novo (somente tela; a impressão mantém o bloco @media print) ===== */
+@media screen {
+  .home-content-panel .report-page {
+    padding: 36px 36px 32px !important;
+    color: var(--cor-texto);
+    font-family: var(--fonte-principal);
+  }
+
+  /* Cabeçalho: código da amostra + número da OS */
+  .home-content-panel .report-head {
+    align-items: flex-start;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--cor-texto);
+  }
+  .home-content-panel .report-head > div:first-child > p {
+    margin: 0 0 4px;
+    color: var(--cor-primaria);
+    font-size: var(--tamanho-label);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+  .home-content-panel .report-head h2 {
+    margin: 0 0 4px;
+    font-size: 30px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--cor-texto);
+  }
+  .home-content-panel .report-head h2 .report-code,
+  .home-content-panel .report-head h2 .report-os {
+    color: inherit;
+    font-size: inherit;
+  }
+  .home-content-panel .report-head h2 .report-code { font-weight: 800; }
+  .home-content-panel .report-head h2 .report-os { font-weight: 400; }
+  .home-content-panel .report-head .report-meta {
+    color: var(--cor-texto-secundario);
+    font-size: var(--tamanho-corpo);
+  }
+
+  /* Observações (preenchidas na etapa 01) */
+  .home-content-panel .report-observations {
+    padding: 18px 0 20px;
+    border-bottom: 1px solid var(--cor-borda);
+  }
+  .home-content-panel .report-observations h3 {
+    margin: 0 0 6px;
+    color: var(--cor-texto);
+    font-size: var(--tamanho-corpo);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+  .home-content-panel .report-observations .sample-observations-text {
+    margin: 0;
+    color: var(--cor-texto);
+    font-size: var(--tamanho-corpo);
+    line-height: 1.55;
+  }
+  .home-content-panel .report-observations .sample-observations-text.is-empty {
+    color: var(--cor-texto-secundario);
+    font-style: italic;
+  }
+
+  /* Faixa de resumo */
+  .home-content-panel .summary-strip {
+    margin: 22px 0 28px;
+    border-bottom: 1px solid var(--cor-borda);
+  }
+  .home-content-panel .summary-strip > div {
+    padding: 14px 16px 18px;
+    border-right: 1px solid var(--cor-borda);
+    align-items: end;
+  }
+  .home-content-panel .summary-strip > div:last-child { border-right: 0; }
+  .home-content-panel .summary-strip > div > span:first-child {
+    color: var(--cor-texto-secundario);
+    font-size: var(--tamanho-apoio);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .home-content-panel .summary-strip strong {
+    color: var(--cor-texto);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  /* Badges de classe: retangulares, texto legível, cores da paleta */
+  .home-content-panel .report-page .status {
+    display: inline-block;
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 11px !important;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  /* Títulos de seção */
+  .home-content-panel .report-grid h3,
+  .home-content-panel .derived h3 {
+    margin: 0 0 4px;
+    color: var(--cor-primaria);
+    font-size: var(--tamanho-titulo-secao);
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+  .home-content-panel .report-grid section > p {
+    margin: 0 0 8px;
+    color: var(--cor-texto-secundario);
+    font-size: var(--tamanho-apoio);
+  }
+  .home-content-panel .report-grid section > p a {
+    color: var(--cor-primaria);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* Tabela de indicadores */
+  .home-content-panel .report-grid table { font-size: var(--tamanho-corpo); }
+  .home-content-panel .report-grid th {
+    padding: 10px 8px;
+    color: var(--cor-texto);
+    font-size: var(--tamanho-corpo);
+    font-weight: 600;
+    border-bottom: 1px solid var(--cor-borda);
+  }
+  .home-content-panel .report-grid td {
+    padding: 9px 8px;
+    color: var(--cor-primaria);
+    border-bottom: 1px solid var(--cor-borda);
+  }
+
+  /* Equilíbrio e correlações */
+  .home-content-panel .insight-list article {
+    padding: 14px 16px;
+    border-left-width: 4px;
+    border-radius: var(--raio-controle);
+  }
+  .home-content-panel .insight-list article > strong {
+    color: var(--cor-texto);
+    font-size: var(--tamanho-corpo);
+    font-weight: 700;
+  }
+  .home-content-panel .insight-list p {
+    margin: 4px 0 0;
+    color: var(--cor-texto);
+    font-size: var(--tamanho-label);
+    line-height: 1.5;
+  }
+  .home-content-panel .insight-list .warning { background: var(--cor-aviso-fundo); border-color: var(--cor-aviso); }
+  .home-content-panel .insight-list .danger  { background: var(--cor-alerta-fundo); border-color: var(--cor-terra); }
+  .home-content-panel .insight-list .good    { background: var(--cor-superficie);   border-color: var(--cor-secundaria); }
+
+  /* Cálculos derivados */
+  .home-content-panel .derived { margin-top: 28px; padding-top: 22px; gap: 12px; }
+  .home-content-panel .derived > div {
+    padding: 14px 16px;
+    border-radius: var(--raio-cartao);
+  }
+  .home-content-panel .derived > div > span {
+    color: var(--cor-texto-secundario);
+    font-size: var(--tamanho-apoio);
+    font-weight: 600;
+  }
+  .home-content-panel .derived > div > strong {
+    margin: 4px 0 2px;
+    color: var(--cor-texto);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .home-content-panel .derived > div > small {
+    color: var(--cor-texto-secundario);
+    font-size: var(--tamanho-apoio);
+  }
+
+  /* Nota técnica */
+  .home-content-panel .report-footer {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--cor-borda);
+    font-size: var(--tamanho-apoio);
+  }
+  .home-content-panel .report-footer > strong { color: var(--cor-texto); font-size: var(--tamanho-label); }
+  .home-content-panel .report-footer p { color: var(--cor-texto-secundario); }
+}
+
+@media screen and (max-width: 900px) {
+  .home-content-panel .report-page { padding: 22px 16px !important; }
+  .home-content-panel .report-head h2 { font-size: 24px; }
+  .home-content-panel .summary-strip strong { font-size: 22px; }
 }

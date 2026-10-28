@@ -5,6 +5,7 @@ import {
   ClipboardPlus,
   FlaskConical,
   Globe,
+  HelpCircle,
   Printer,
   Search,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { useAuth } from "@/context/AuthContext"; // NOVO (Fase 4)
 import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   NativeSelect,
@@ -31,22 +33,26 @@ import {
   getHealth,
   getInterpretation,
   listSamples,
+  request,
   updateAnalysis,
 } from "@/lib/api";
 import {
   ANALYSIS_FIELDS,
+  analysisUnitOptions,
   type Sample,
   type SoilAnalysis,
   type SoilReport,
 } from "@/lib/soil";
 
 const makeEmptyMeta = () => ({
+  serviceOrderNumber: "",
   block: "",
   plot: "",
   row: "",
-  crop: "Acerola",
+  crop: "",
   sampledAt: new Date().toISOString().slice(0, 10),
   temperature: "",
+  observations: "",
   depth: "0–20 cm",
 });
 
@@ -75,6 +81,9 @@ export default function Home() {
   const sampleIdParam = searchParams.get("sample");
 
   const [samples, setSamples] = useState<Sample[]>([]);
+  const [cultures, setCultures] = useState<string[]>([]);
+  const [culturesLoading, setCulturesLoading] = useState(true);
+  const [culturesError, setCulturesError] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [meta, setMeta] = useState(makeEmptyMeta);
   const [analysis, setAnalysis] = useState<SoilAnalysis>(makeEmptyAnalysis);
@@ -112,12 +121,37 @@ export default function Home() {
   const filtered = useMemo(
     () =>
       samples.filter((sample) =>
-        `${sample.code} ${sample.block} ${sample.plot} ${sample.crop}`
+        `${sample.code} ${sample.serviceOrderNumber ?? ""} ${sample.block} ${sample.plot} ${sample.crop}`
           .toLowerCase()
           .includes(query.toLowerCase()),
       ),
     [samples, query],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    request<string[]>("/interpretation-parameters/cultures")
+      .then((items) => {
+        if (!cancelled) {
+          setCultures(items);
+          setCulturesError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCultures([]);
+          setCulturesError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCulturesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     async function bootstrap() {
@@ -154,6 +188,20 @@ export default function Home() {
   async function createSample(event: React.FormEvent) {
     event.preventDefault();
 
+    // A cultura precisa existir no catálogo persistido, carregado de Parâmetros.
+    if (culturesLoading) {
+      toast.error("Aguarde o carregamento das culturas cadastradas.");
+      return;
+    }
+    if (culturesError) {
+      toast.error("Não foi possível consultar as culturas cadastradas. Tente novamente.");
+      return;
+    }
+    if (!meta.crop || !cultures.includes(meta.crop)) {
+      toast.error("Selecione uma cultura cadastrada e salva na tela Parâmetros.");
+      return;
+    }
+
     try {
       const sample = await createSampleApi({
         ...meta,
@@ -182,12 +230,23 @@ export default function Home() {
     event.preventDefault();
     if (!selectedId) return;
 
-    const numeric = Object.fromEntries(
-      Object.entries(analysis).map(([key, value]) => [
-        key,
-        value === "" || value === null ? null : Number(value),
-      ]),
-    ) as SoilAnalysis;
+    const units = analysis.units ?? {};
+    const needsDensity = ANALYSIS_FIELDS.some((field) =>
+      field.unit === "g/dm³" && units[field.key]?.endsWith("/kg") &&
+      analysis[field.key] !== "" && analysis[field.key] != null,
+    );
+    if (needsDensity && !(Number(analysis.density) > 0)) {
+      toast.error("Informe a densidade de conversão para resultados por massa (g/kg ou mg/kg).");
+      return;
+    }
+    const numeric = {
+      ...Object.fromEntries(ANALYSIS_FIELDS.map(({ key }) => [
+        key, analysis[key] === "" || analysis[key] == null ? null : Number(analysis[key]),
+      ])),
+      units,
+      density: analysis.density === "" || analysis.density == null ? null : Number(analysis.density),
+      phosphorusMethod: analysis.phosphorusMethod ?? "Resina",
+    } as SoilAnalysis;
 
     try {
       const updated = await updateAnalysis(selectedId, numeric);
@@ -276,7 +335,12 @@ export default function Home() {
                   onClick={() => void chooseSample(sample)}
                   className={`sample-card ${selectedId === sample.id ? "selected" : ""}`}
                 >
-                  <span className="sample-code">{sample.code}</span>
+                  <span className="sample-card-heading">
+                    <span className="sample-code">{sample.code}</span>
+                    {sample.serviceOrderNumber && (
+                      <span className="sample-order">OS-{sample.serviceOrderNumber}</span>
+                    )}
+                  </span>
                   <strong>
                     {sample.block} · {sample.plot}
                   </strong>
@@ -303,7 +367,11 @@ export default function Home() {
         <section className="content-panel home-content-panel">
           <div className="page-intro no-print ds-page-heading">
             <p>GESTÃO DE FERTILIDADE</p>
-            <h1>{selected ? selected.code : "Nova Amostragem"}</h1>
+            <h1>
+              {selected
+                ? `${selected.code}${selected.serviceOrderNumber ? ` · OS-${selected.serviceOrderNumber}` : ""}`
+                : "Nova Amostragem"}
+            </h1>
             <span>
               {selected
                 ? `${selected.crop} · Bloco ${selected.block} · Quadra ${selected.plot}`
@@ -334,37 +402,83 @@ export default function Home() {
               </div>
 
               <form onSubmit={createSample} className="form-grid">
+                <div className="field field-serviceOrderNumber">
+                  <div className="field-label-with-help">
+                    <Label htmlFor="serviceOrderNumber">Número da OS</Label>
+                    <span
+                      className="field-help-trigger"
+                      tabIndex={0}
+                      aria-label="Ajuda sobre o número da OS"
+                      aria-describedby="service-order-help"
+                    >
+                      <HelpCircle size={15} aria-hidden="true" />
+                      <span id="service-order-help" className="field-tooltip" role="tooltip">
+                        Informe os 8 dígitos da ordem de serviço, incluindo zeros à esquerda.
+                      </span>
+                    </span>
+                  </div>
+                  <Input id="serviceOrderNumber" name="serviceOrderNumber" type="text"
+                    inputMode="numeric" pattern="[0-9]{8}" minLength={8} maxLength={8}
+                    required placeholder="Ex.: 00123456" value={meta.serviceOrderNumber}
+                    aria-describedby="service-order-help"
+                    onChange={(event) => setMeta({ ...meta, serviceOrderNumber: event.target.value })} />
+                </div>
                 {[
                   ["Bloco", "block", "Ex.: C"],
                   ["Quadra", "plot", "Ex.: Q12"],
                   ["Linha", "row", "Ex.: L08"],
-                  ["Cultura", "crop", "Ex.: Acerola"],
+                  ["Cultura", "crop", "Escolha uma cultura"],
                   ["Data da coleta", "sampledAt", ""],
                   ["Temperatura (°C)", "temperature", "Ex.: 27"],
                 ].map(([label, key, placeholder]) => (
-                  <div className="field" key={key}>
+                  <div className={`field field-${key}`} key={key}>
                     <Label htmlFor={key}>{label}</Label>
-                    <Input
-                      id={key}
-                      type={
-                        key === "sampledAt"
-                          ? "date"
-                          : key === "temperature"
-                            ? "number"
-                            : "text"
-                      }
-                      step={key === "temperature" ? "any" : undefined}
-                      required
-                      value={(meta as Record<string, string>)[key]}
-                      placeholder={placeholder}
-                      onChange={(event) =>
-                        setMeta({ ...meta, [key]: event.target.value })
-                      }
-                    />
+                    {key === "crop" ? (
+                      <NativeSelect
+                        id="crop"
+                        value={meta.crop}
+                        required
+                        disabled={culturesLoading || culturesError || cultures.length === 0}
+                        onChange={(event) => setMeta({ ...meta, crop: event.target.value })}
+                      >
+                        <NativeSelectOption value="">
+                          {culturesLoading
+                            ? "Carregando culturas..."
+                            : culturesError
+                              ? "Não foi possível carregar as culturas"
+                              : cultures.length > 0
+                                ? "Escolha uma cultura"
+                                : "Cadastre uma cultura em Parâmetros"}
+                        </NativeSelectOption>
+                        {cultures.map((culture) => (
+                          <NativeSelectOption key={culture} value={culture}>
+                            {culture}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    ) : (
+                      <Input
+                        id={key}
+                        type={
+                          key === "sampledAt"
+                            ? "date"
+                            : key === "temperature"
+                              ? "number"
+                              : "text"
+                        }
+                        step={key === "temperature" ? "any" : undefined}
+                        required
+                        value={(meta as Record<string, string>)[key]}
+                        placeholder={placeholder}
+                        onChange={(event) =>
+                          setMeta({ ...meta, [key]: event.target.value })
+                        }
+                      />
+                    )}
                   </div>
                 ))}
 
-                <div className="field">
+                <div className="field field-depth">
                   <Label htmlFor="depth">Profundidade</Label>
                   <NativeSelect
                     id="depth"
@@ -375,6 +489,18 @@ export default function Home() {
                     <NativeSelectOption value="20–40 cm">20–40 cm</NativeSelectOption>
                     <NativeSelectOption value="40–60 cm">40–60 cm</NativeSelectOption>
                   </NativeSelect>
+                </div>
+
+                <div className="field sample-observations">
+                  <Label htmlFor="observations">Observações</Label>
+                  <Textarea
+                    id="observations"
+                    name="observations"
+                    rows={3}
+                    placeholder="Informações adicionais sobre a coleta (opcional)"
+                    value={meta.observations}
+                    onChange={(event) => setMeta({ ...meta, observations: event.target.value })}
+                  />
                 </div>
 
                 <div className="form-actions sampling-actions">
@@ -411,13 +537,60 @@ export default function Home() {
                             })
                           }
                         />
-                        <span>{field.unit}</span>
+                        {analysisUnitOptions(field.unit).length > 0 ? (
+                          <NativeSelect
+                            aria-label={`Unidade de ${field.label}`}
+                            value={analysis.units?.[field.key] ?? field.unit}
+                            onChange={(event) => setAnalysis({
+                              ...analysis,
+                              units: { ...analysis.units, [field.key]: event.target.value },
+                            })}
+                          >
+                            {analysisUnitOptions(field.unit).map((unit) => (
+                              <NativeSelectOption key={unit} value={unit}>{unit}</NativeSelectOption>
+                            ))}
+                          </NativeSelect>
+                        ) : <span>{field.unit}</span>}
                       </div>
                     </div>
                   ))}
 
+                  <div className="analysis-field analysis-field-phosphorus-method">
+                    <Label htmlFor="phosphorusMethod">Extrator de fósforo</Label>
+                    <div>
+                      <NativeSelect id="phosphorusMethod" value={analysis.phosphorusMethod ?? "Resina"}
+                        onChange={(event) => setAnalysis({ ...analysis, phosphorusMethod: event.target.value })}>
+                        {["Resina", "Mehlich 1", "Não informado"].map((method) => (
+                          <NativeSelectOption key={method} value={method}>{method}</NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                  </div>
+                  <div className="analysis-field analysis-field-density">
+                    <div className="field-label-with-help">
+                      <Label htmlFor="density">Densidade de Conversão (kg/dm³)</Label>
+                      <span
+                        className="field-help-trigger"
+                        tabIndex={0}
+                        aria-label="Ajuda sobre a densidade de conversão"
+                        aria-describedby="density-help"
+                      >
+                        <HelpCircle size={15} aria-hidden="true" />
+                        <span id="density-help" className="field-tooltip" role="tooltip">
+                          Necessária para converter g/kg ou mg/kg em g/dm³. Use a relação massa/volume validada para o método do laboratório.
+                        </span>
+                      </span>
+                    </div>
+                    <div>
+                      <Input id="density" type="number" min="0" step="any"
+                        value={analysis.density ?? ""}
+                        onChange={(event) => setAnalysis({ ...analysis, density: event.target.value })}
+                        aria-describedby="density-help" />
+                    </div>
+                  </div>
+
                   <div className="form-actions analysis-actions">
-                    <Button variant="outline" type="button" onClick={() => setTab("cadastro")}>
+                    <Button className="analysis-back-button" variant="outline" type="button" onClick={() => setTab("cadastro")}>
                       Voltar
                     </Button>
                     <Button type="submit">Salvar e interpretar</Button>
@@ -425,10 +598,10 @@ export default function Home() {
                 </div>
 
                 <div className="method-note">
-                  <strong>Métodos esperados:</strong> P por resina; Ca, Mg e Al por
+                  <strong>Métodos esperados:</strong> P conforme o extrator selecionado; Ca, Mg e Al por
                   KCl; K e Na conforme o método do laboratório; H+Al por SMP ou
                   acetato; micronutrientes conforme indicação do laboratório.
-                  Informe os resultados nas unidades apresentadas em cada campo.
+                  Selecione a unidade original de cada resultado. Os cálculos usam mmolc/dm³, g/dm³ e g/kg. Alterar a unidade não altera o número digitado; confira ambos conforme o laudo.
                 </div>
               </form>
             </TabsContent>
@@ -449,8 +622,13 @@ export default function Home() {
                   <div className="report-head">
                     <div>
                       <p>RELATÓRIO DE INTERPRETAÇÃO</p>
-                      <h2>{selected.code}</h2>
-                      <span>
+                      <h2>
+                        <span className="report-code">{selected.code}</span>
+                        {selected.serviceOrderNumber && (
+                          <span className="report-os"> · OS-{selected.serviceOrderNumber}</span>
+                        )}
+                      </h2>
+                      <span className="report-meta">
                         {selected.crop} · {selected.block}/{selected.plot}/{selected.row} ·{" "}
                         {selected.depth}
                       </span>
@@ -472,6 +650,13 @@ export default function Home() {
                     </div>
                   </div>
 
+                  <section className="report-observations">
+                    <h3>Observações</h3>
+                    <p className={`sample-observations-text${selected.observations?.trim() ? "" : " is-empty"}`}>
+                      {selected.observations?.trim() || "Nenhuma observação registrada na amostragem."}
+                    </p>
+                  </section>
+
                   <div className="summary-strip">
                     {report.summary.map((item) => (
                       <div key={item.label}>
@@ -485,6 +670,9 @@ export default function Home() {
                   <div className="report-grid">
                     <section>
                       <h3>Interpretação dos indicadores</h3>
+                      <p>Classificação conforme os parâmetros atuais cadastrados para a cultura da amostra.
+                        <a className="no-print" href="/parametros-interpretacao"> Configurar parâmetros</a>
+                      </p>
                       <table>
                         <thead>
                           <tr>
