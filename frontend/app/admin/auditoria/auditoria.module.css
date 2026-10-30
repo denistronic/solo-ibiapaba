@@ -1,0 +1,29 @@
+.content { max-width: 1200px; margin: 0 auto; padding: 32px 24px 64px; min-width: 0; }
+.heading,.resultsHeading,.eventTop { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
+.heading { margin-bottom: 26px; }
+.heading>div { min-width: 0; }
+.heading h1 { display: flex; align-items: center; gap: 10px; font-size: 28px; margin: 6px 0; }
+.heading h1 svg { flex: 0 0 auto; }
+.heading p { color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .14em; margin: 0; }
+.heading span,.event time { color: var(--muted); font-size: 13px; }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 24px; margin-bottom: 20px; min-width: 0; }
+.panel h2 { font-size: 19px; margin: 0 0 18px; }
+.panel p { line-height: 1.6; font-size: 14px; overflow-wrap: anywhere; }
+.filters { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
+.filters>div,.resultsHeading>div { min-width: 0; }
+.filters label,.resultsHeading label { display: block; font-size: 12px; margin-bottom: 7px; font-weight: 650; }
+.filters select { width: 100%; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; grid-column: 1/-1; }
+.event { border-top: 1px solid var(--line); padding: 20px 0; }
+.event p { margin: 9px 0; }
+.eventTop strong { color: var(--forest); }
+.pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 20px; border-top: 1px solid var(--line); }
+.tableWrap { max-width: 100%; overflow-x: auto; }
+.tableWrap table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tableWrap th,.tableWrap td { text-align: left; padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.tableWrap thead { background: var(--cor-superficie); }
+.changed td:last-child { color: var(--forest); background: var(--cor-superficie); }
+.check { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 14px; }
+.loading { padding: 48px; text-align: center; }
+@media(max-width:800px) { .filters { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:580px) { .content { padding: 20px 14px 40px; } .panel { padding: 18px 14px; } .filters { grid-template-columns: minmax(0,1fr); } .heading h1 { font-size: 24px; } .eventTop { gap: 5px; } .tableWrap th,.tableWrap td { padding: 9px 5px; font-size: 12px; } .actions button { white-space: normal; height: auto; min-height: 36px; } }

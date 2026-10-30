@@ -12,6 +12,8 @@ public interface SampleRepository {
 
     Optional<Sample> findById(UUID id);
 
+    Optional<Sample> findByIdForUpdate(UUID id);
+
     Sample save(Sample sample);
 
     int nextSequenceForYear(int year);

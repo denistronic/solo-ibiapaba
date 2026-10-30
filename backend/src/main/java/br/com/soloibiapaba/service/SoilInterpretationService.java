@@ -3,221 +3,118 @@ package br.com.soloibiapaba.service;
 import br.com.soloibiapaba.domain.SoilAnalysis;
 import br.com.soloibiapaba.dto.SoilReportResponse;
 import org.springframework.stereotype.Service;
-
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 
 @Service
 public class SoilInterpretationService {
     private final InterpretationParameterService parameters;
     public SoilInterpretationService(InterpretationParameterService parameters) { this.parameters = parameters; }
 
-
-    /**
-     * Produz os indicadores e cálculos derivados do laudo.
-     *
-     * Unidades esperadas na análise:
-     * - Ca, Mg, K, Na, Al, H+Al e CTC: mmolc/dm³;
-     * - matéria orgânica, carbono orgânico e nutrientes: g/dm³;
-     * - argila, silte e areia: g/kg.
-     *
-     * A classificação dos indicadores utiliza os limites cadastrados por cultura.
-     */
-    public SoilReportResponse analyze(SoilAnalysis analysis, String crop) {
-        analysis = SoilUnits.normalize(analysis);
+    public SoilReportResponse analyze(SoilAnalysis original, String crop) {
+        SoilAnalysis a = SoilUnits.normalize(original);
         var ranges = parameters.ranges(crop);
-        // O pH em água é derivado do pH em CaCl2 conforme orientação do laboratório.
-        // O cálculo aqui também protege relatórios antigos/entradas sem phWater.
-        double phWater = analysis.phCaCl2() != null
-                ? n(analysis.phCaCl2()) + 0.6
-                : n(analysis.phWater());
+        BigDecimal ph = a.phCaCl2() == null ? a.phWater() : a.phCaCl2().add(new BigDecimal("0.6"));
+        BigDecimal sb = sum(a.calcium(), a.magnesium(), a.potassium(), a.sodium());
+        BigDecimal effective = sum(sb, a.aluminum());
+        BigDecimal total = sum(sb, a.hAl());
+        BigDecimal v = divide(sb == null ? null : sb.multiply(new BigDecimal("100")), total);
+        BigDecimal m = divide(a.aluminum() == null ? null : a.aluminum().multiply(new BigDecimal("100")), effective);
+        BigDecimal caMg = divide(a.calcium(), a.magnesium());
+        BigDecimal caK = divide(a.calcium(), a.potassium());
+        BigDecimal mgK = divide(a.magnesium(), a.potassium());
 
-        // Todos os cátions são recebidos diretamente em mmolc/dm³.
-        double potassium = n(analysis.potassium());
-        double sodium = n(analysis.sodium());
-        double calcium = n(analysis.calcium());
-        double magnesium = n(analysis.magnesium());
-        double aluminum = n(analysis.aluminum());
-        double totalAcidity = n(analysis.hAl());
-
-        // Cálculos de fertilidade, mantendo a mesma unidade dos cátions.
-        double baseSum = calcium + magnesium + potassium + sodium;
-        double effectiveCec = baseSum + aluminum;
-        double cecAtPh7 = baseSum + totalAcidity;
-        double baseSaturation = cecAtPh7 != 0.0
-                ? 100.0 * baseSum / cecAtPh7
-                : 0.0;
-        double aluminumSaturation = effectiveCec != 0.0
-                ? 100.0 * aluminum / effectiveCec
-                : 0.0;
-
-        // As relações são adimensionais; todos os valores estão em mmolc/dm³.
-        double caMg = magnesium != 0.0 ? calcium / magnesium : 0.0;
-        double caK = potassium != 0.0 ? calcium / potassium : 0.0;
-        double mgK = potassium != 0.0 ? magnesium / potassium : 0.0;
-
-        BigDecimal indicatorPh = analysis.phCaCl2() != null
-                ? analysis.phCaCl2().add(new BigDecimal("0.6")) : analysis.phWater();
-        boolean hasBases = analysis.calcium() != null && analysis.magnesium() != null
-                && analysis.potassium() != null && analysis.sodium() != null;
-        BigDecimal indicatorV = hasBases && analysis.hAl() != null && cecAtPh7 != 0.0
-                ? BigDecimal.valueOf(baseSaturation) : null;
-        BigDecimal indicatorM = hasBases && analysis.aluminum() != null && effectiveCec != 0.0
-                ? BigDecimal.valueOf(aluminumSaturation) : null;
-
-        List<SoilReportResponse.SummaryItem> summary = List.of(
-                new SoilReportResponse.SummaryItem(
-                        "pH em água (calculado)",
-                        phWater > 0.0 ? oneDecimal(phWater) : "—",
-                        InterpretationParameterService.classify(indicatorPh, ranges.get("pH em água (calculado)"))
-                ),
-                new SoilReportResponse.SummaryItem(
-                        "V%",
-                        indicatorV == null ? "—" : fmt(baseSaturation, "%"),
-                        InterpretationParameterService.classify(indicatorV, ranges.get("Saturação por bases"))
-                ),
-                new SoilReportResponse.SummaryItem(
-                        "m%",
-                        indicatorM == null ? "—" : fmt(aluminumSaturation, "%"),
-                        InterpretationParameterService.classify(indicatorM, ranges.get("Saturação por alumínio"))
-                ),
-                new SoilReportResponse.SummaryItem(
-                        "CTC pH 7",
-                        fmt(cecAtPh7, "mmolc/dm³"),
-                        "Informativo"
-                )
+        var summary = List.of(
+            new SoilReportResponse.SummaryItem("pH em água (calculado)", ph == null ? "—" : oneDecimal(ph), level(ph,ranges,"pH em água (calculado)")),
+            new SoilReportResponse.SummaryItem("V%", fmt(v,"%"), level(v,ranges,"Saturação por bases")),
+            new SoilReportResponse.SummaryItem("m%", fmt(m,"%"), level(m,ranges,"Saturação por alumínio")),
+            new SoilReportResponse.SummaryItem("CTC pH 7",fmt(total,"mmolc/dm³"),total == null ? "Sem dado" : "Informativo")
         );
-
         List<SoilReportResponse.IndicatorItem> indicators = new ArrayList<>();
+        add(indicators,ranges,"pH em água (calculado)",ph,"");
+        add(indicators,ranges,"Matéria orgânica",a.organicMatter(),"g/dm³");
+        add(indicators,ranges,"Carbono orgânico total",a.organicCarbon(),"g/dm³");
+        String method = a.phosphorusMethod() == null ? "Não informado" : a.phosphorusMethod();
+        add(indicators,ranges,"Fósforo (P) — " + method,a.phosphorus(),"g/dm³");
+        add(indicators,ranges,"Potássio (K)",a.potassium(),"mmolc/dm³");
+        add(indicators,ranges,"Sódio (Na)",a.sodium(),"mmolc/dm³");
+        add(indicators,ranges,"Cálcio (Ca)",a.calcium(),"mmolc/dm³");
+        add(indicators,ranges,"Magnésio (Mg)",a.magnesium(),"mmolc/dm³");
+        add(indicators,ranges,"Alumínio total (Al)",a.aluminum(),"mmolc/dm³");
+        add(indicators,ranges,"Acidez total (H+Al)",a.hAl(),"mmolc/dm³");
+        add(indicators,ranges,"CTC informada pelo laboratório",a.cecReported(),"mmolc/dm³");
+        add(indicators,ranges,"V informado pelo laboratório",a.baseSatReported(),"%");
+        add(indicators,ranges,"Saturação por bases",v,"%");
+        add(indicators,ranges,"Saturação por alumínio",m,"%");
+        add(indicators,ranges,"Enxofre (S)",a.sulfur(),"g/dm³");
+        add(indicators,ranges,"Boro (B)",a.boron(),"g/dm³");
+        add(indicators,ranges,"Cobre (Cu)",a.copper(),"g/dm³");
+        add(indicators,ranges,"Ferro (Fe)",a.iron(),"g/dm³");
+        add(indicators,ranges,"Manganês (Mn)",a.manganese(),"g/dm³");
+        add(indicators,ranges,"Zinco (Zn)",a.zinc(),"g/dm³");
+        add(indicators,ranges,"Argila",a.clay(),"g/kg");
+        add(indicators,ranges,"Silte",a.silt(),"g/kg");
+        add(indicators,ranges,"Areia total",a.sand(),"g/kg");
 
-        addConfiguredIndicator(indicators, ranges, "pH em água (calculado)", indicatorPh, "");
-        addConfiguredIndicator(indicators, ranges, "Matéria orgânica", analysis.organicMatter(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Carbono orgânico total", analysis.organicCarbon(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Fósforo (P) — " + (analysis.phosphorusMethod() == null ? "Resina" : analysis.phosphorusMethod()), analysis.phosphorus(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Potássio (K)", analysis.potassium(), "mmolc/dm³");
-        addConfiguredIndicator(indicators, ranges, "Sódio (Na)", analysis.sodium(), "mmolc/dm³");
-        addConfiguredIndicator(indicators, ranges, "Cálcio (Ca)", analysis.calcium(), "mmolc/dm³");
-        addConfiguredIndicator(indicators, ranges, "Magnésio (Mg)", analysis.magnesium(), "mmolc/dm³");
-        addConfiguredIndicator(indicators, ranges, "Alumínio total (Al)", analysis.aluminum(), "mmolc/dm³");
-        addConfiguredIndicator(indicators, ranges, "Acidez total (H+Al)", analysis.hAl(), "mmolc/dm³");
-        addConfiguredIndicator(indicators, ranges, "CTC informada pelo laboratório", analysis.cecReported(), "mmolc/dm³");
-        addConfiguredIndicator(indicators, ranges, "V informado pelo laboratório", analysis.baseSatReported(), "%");
-        addConfiguredIndicator(indicators, ranges, "Saturação por bases", indicatorV, "%");
-        addConfiguredIndicator(indicators, ranges, "Saturação por alumínio", indicatorM, "%");
-        addConfiguredIndicator(indicators, ranges, "Enxofre (S)", analysis.sulfur(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Boro (B)", analysis.boron(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Cobre (Cu)", analysis.copper(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Ferro (Fe)", analysis.iron(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Manganês (Mn)", analysis.manganese(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Zinco (Zn)", analysis.zinc(), "g/dm³");
-        addConfiguredIndicator(indicators, ranges, "Argila", analysis.clay(), "g/kg");
-        addConfiguredIndicator(indicators, ranges, "Silte", analysis.silt(), "g/kg");
-        addConfiguredIndicator(indicators, ranges, "Areia total", analysis.sand(), "g/kg");
-
+        // Mantém os alertas gerais anteriores; não substituem as faixas por cultura.
         List<SoilReportResponse.InsightItem> insights = new ArrayList<>();
-
-        if (phWater > 0.0 && phWater < 5.5) {
-            insights.add(new SoilReportResponse.InsightItem(
-                    "Acidez ativa",
-                    "pH em água calculado abaixo da faixa geral pode limitar nutrientes e elevar o risco associado ao alumínio.",
-                    "warning"
-            ));
+        if (below(ph,"5.5")) insights.add(new SoilReportResponse.InsightItem("Acidez ativa",
+            "pH em água calculado abaixo da faixa geral pode limitar nutrientes e elevar o risco associado ao alumínio.","warning"));
+        if (above(m,"20")) insights.add(new SoilReportResponse.InsightItem("Alumínio relevante",
+            "A saturação por alumínio calculada é %s%%. Avaliar calagem conforme cultura, camada e PRNT.".formatted(oneDecimal(m)),"danger"));
+        if (below(caMg,"2") || above(caMg,"8")) insights.add(new SoilReportResponse.InsightItem("Relação Ca/Mg desequilibrada",
+            "Relação calculada de %s. Use a relação como alerta, não como meta isolada.".formatted(oneDecimal(caMg)),"warning"));
+        if (below(mgK,"3")) insights.add(new SoilReportResponse.InsightItem("Competição K × Mg",
+            "Potássio proporcionalmente elevado pode agravar a absorção de magnésio em culturas sensíveis.","warning"));
+        if (ph == null || v == null || m == null || caMg == null || caK == null || mgK == null) {
+            insights.add(new SoilReportResponse.InsightItem("Dados insuficientes",
+                "Há dados ausentes ou divisores iguais a zero; não é possível concluir a triagem dos equilíbrios do solo.","warning"));
         }
+        if (insights.isEmpty()) insights.add(new SoilReportResponse.InsightItem("Sem alerta crítico automático",
+            "Os principais equilíbrios calculados não ultrapassaram os limites gerais de triagem.","good"));
 
-        if (aluminumSaturation > 20) {
-            insights.add(new SoilReportResponse.InsightItem(
-                    "Alumínio relevante",
-                    "A saturação por alumínio calculada é %s%%. Avaliar calagem conforme cultura, camada e PRNT."
-                            .formatted(oneDecimal(aluminumSaturation)),
-                    "danger"
-            ));
-        }
-
-        if (caMg != 0.0 && (caMg < 2 || caMg > 8)) {
-            insights.add(new SoilReportResponse.InsightItem(
-                    "Relação Ca/Mg desequilibrada",
-                    "Relação calculada de %s. Use a relação como alerta, não como meta isolada."
-                            .formatted(oneDecimal(caMg)),
-                    "warning"
-            ));
-        }
-
-        if (mgK != 0.0 && mgK < 3) {
-            insights.add(new SoilReportResponse.InsightItem(
-                    "Competição K × Mg",
-                    "Potássio proporcionalmente elevado pode agravar a absorção de magnésio em culturas sensíveis.",
-                    "warning"
-            ));
-        }
-
-        // Não há mais indicador nem alerta de condutividade elétrica.
-        if (insights.isEmpty()) {
-            insights.add(new SoilReportResponse.InsightItem(
-                    "Sem alerta crítico automático",
-                    "Os principais equilíbrios calculados não ultrapassaram os limites gerais de triagem.",
-                    "good"
-            ));
-        }
-
-        List<SoilReportResponse.DerivedItem> derived = List.of(
-                new SoilReportResponse.DerivedItem(
-                        "Soma de bases (SB)",
-                        fmt(baseSum, "mmolc/dm³"),
-                        "Ca + Mg + K + Na"
-                ),
-                new SoilReportResponse.DerivedItem(
-                        "CTC efetiva (t)",
-                        fmt(effectiveCec, "mmolc/dm³"),
-                        "SB + Al"
-                ),
-                new SoilReportResponse.DerivedItem(
-                        "CTC pH 7 (T)",
-                        fmt(cecAtPh7, "mmolc/dm³"),
-                        "SB + H+Al"
-                ),
-                new SoilReportResponse.DerivedItem("V%", fmt(baseSaturation, "%"), "100 × SB / T"),
-                new SoilReportResponse.DerivedItem("m%", fmt(aluminumSaturation, "%"), "100 × Al / t"),
-                new SoilReportResponse.DerivedItem("Ca/Mg", fmt(caMg, ""), "Ca ÷ Mg"),
-                new SoilReportResponse.DerivedItem("Ca/K", fmt(caK, ""), "Ca ÷ K (mmolc)"),
-                new SoilReportResponse.DerivedItem("Mg/K", fmt(mgK, ""), "Mg ÷ K (mmolc)")
+        var derived = List.of(
+            new SoilReportResponse.DerivedItem("Soma de bases (SB)",fmt(sb,"mmolc/dm³"),"Ca + Mg + K + Na"),
+            new SoilReportResponse.DerivedItem("CTC efetiva (t)",fmt(effective,"mmolc/dm³"),"SB + Al"),
+            new SoilReportResponse.DerivedItem("CTC pH 7 (T)",fmt(total,"mmolc/dm³"),"SB + H+Al"),
+            new SoilReportResponse.DerivedItem("V%",fmt(v,"%"),"100 × SB / T"),
+            new SoilReportResponse.DerivedItem("m%",fmt(m,"%"),"100 × Al / t"),
+            new SoilReportResponse.DerivedItem("Ca/Mg",fmt(caMg,""),"Ca ÷ Mg"),
+            new SoilReportResponse.DerivedItem("Ca/K",fmt(caK,""),"Ca ÷ K (mmolc)"),
+            new SoilReportResponse.DerivedItem("Mg/K",fmt(mgK,""),"Mg ÷ K (mmolc)")
         );
-
-        return new SoilReportResponse(summary, List.copyOf(indicators), List.copyOf(insights), derived);
+        return new SoilReportResponse(summary,List.copyOf(indicators),List.copyOf(insights),derived);
     }
-
-    private void addConfiguredIndicator(List<SoilReportResponse.IndicatorItem> indicators,
-            java.util.Map<String, InterpretationParameterService.Range> ranges,
-            String label, BigDecimal value, String unit) {
-        indicators.add(new SoilReportResponse.IndicatorItem(label,
-                value == null ? "—" : fmt(value.doubleValue(), unit),
-                InterpretationParameterService.classify(value, ranges.get(label))));
+    private static BigDecimal sum(BigDecimal... values) {
+        BigDecimal result = BigDecimal.ZERO;
+        for (BigDecimal value : values) { if (value == null) return null; result = result.add(value); }
+        return result;
     }
-
-    private double n(BigDecimal value) {
-        return value == null ? 0.0 : value.doubleValue();
+    private static BigDecimal divide(BigDecimal numerator, BigDecimal denominator) {
+        return numerator == null || denominator == null || denominator.signum() == 0
+                ? null : numerator.divide(denominator, MathContext.DECIMAL128);
     }
-
-    private String fmt(double value, String unit) {
+    private static boolean below(BigDecimal value,String limit) { return value != null && value.compareTo(new BigDecimal(limit)) < 0; }
+    private static boolean above(BigDecimal value,String limit) { return value != null && value.compareTo(new BigDecimal(limit)) > 0; }
+    private static String level(BigDecimal value,Map<String,InterpretationParameterService.Range> ranges,String label) {
+        return InterpretationParameterService.classify(value,ranges.get(label));
+    }
+    private static void add(List<SoilReportResponse.IndicatorItem> items,Map<String,InterpretationParameterService.Range> ranges,
+            String label,BigDecimal value,String unit) {
+        items.add(new SoilReportResponse.IndicatorItem(label,fmt(value,unit),level(value,ranges,label)));
+    }
+    private static String fmt(BigDecimal value,String unit) {
+        if (value == null) return "—";
+        BigDecimal rounded = value.setScale(value.abs().compareTo(BigDecimal.ONE) >= 0 ? 2 : 10,RoundingMode.HALF_UP);
         String number;
-        if (!Double.isFinite(value)) {
-            number = "—";
-        } else {
-            // Mantém duas casas para valores >= 1 e até seis para valores menores,
-            // evitando que nutrientes em g/dm³ apareçam como 0,00.
-            int decimals = Math.abs(value) >= 1.0 ? 2 : 6;
-            number = String.format(Locale.ROOT, "%." + decimals + "f", value).trim();
-            if (Math.abs(value) < 1.0 && number.indexOf('.') >= 0) {
-                while (number.endsWith("0") && number.length() - number.indexOf('.') > 3) {
-                    number = number.substring(0, number.length() - 1);
-                }
-            }
-        }
+        if (value.signum() != 0 && rounded.signum() == 0) number = value.stripTrailingZeros().toEngineeringString();
+        else if (value.abs().compareTo(BigDecimal.ONE) >= 0) number = rounded.toPlainString();
+        else number = rounded.stripTrailingZeros().setScale(Math.max(2,rounded.stripTrailingZeros().scale())).toPlainString();
         return unit == null || unit.isBlank() ? number : number + " " + unit;
     }
-
-    private String oneDecimal(double value) {
-        return String.format(Locale.ROOT, "%.1f", value);
-    }
+    private static String oneDecimal(BigDecimal value) { return value.setScale(1,RoundingMode.HALF_UP).toPlainString(); }
 }

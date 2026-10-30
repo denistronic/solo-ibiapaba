@@ -1,0 +1,44 @@
+# Credenciais locais; somente exemplos podem ser versionados.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependências e builds
+**/node_modules/
+**/target/
+**/.next/
+**/out/
+**/dist/
+**/coverage/
+**/playwright-report/
+**/test-results/
+*.tsbuildinfo
+frontend/next-env.d.ts
+
+# Banco, backups e dados de execução
+**/backups/
+backend/data/
+*.dump
+*.backup
+*.sql.gz
+*.sql.xz
+*.mv.db
+*.trace.db
+*.sqlite
+*.sqlite3
+
+# Logs, relatórios locais e ferramentas
+*.log
+integracao/RESULTADO-DOCKER-LOCAL.json
+__pycache__/
+*.py[cod]
+.venv/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Claude outputs/

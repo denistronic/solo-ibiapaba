@@ -19,8 +19,17 @@ public record Sample(
         Instant createdAt,
         SoilAnalysis analysis,
         Instant analysisUpdatedAt,
-        String observations
+        String observations,
+        SampleTracking tracking
 ) {
+    public Sample(UUID id, String code, String serviceOrderNumber, String block, String plot, String row,
+            String crop, LocalDate sampledAt, BigDecimal temperature, String depth, Instant createdAt,
+            SoilAnalysis analysis, Instant analysisUpdatedAt, String observations) {
+        this(id,code,serviceOrderNumber,block,plot,row,crop,sampledAt,temperature,depth,createdAt,analysis,analysisUpdatedAt,observations,SampleTracking.unknown());
+    }
+    public Sample withTracking(SampleTracking value) {
+        return new Sample(id,code,serviceOrderNumber,block,plot,row,crop,sampledAt,temperature,depth,createdAt,analysis,analysisUpdatedAt,observations,value);
+    }
     public Sample withAnalysis(SoilAnalysis newAnalysis, Instant updatedAt) {
         return new Sample(
                 id,
@@ -36,7 +45,8 @@ public record Sample(
                 createdAt,
                 newAnalysis,
                 updatedAt,
-                observations
+                observations,
+                tracking
         );
     }
 }

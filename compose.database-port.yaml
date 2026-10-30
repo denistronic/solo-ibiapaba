@@ -1,0 +1,5 @@
+# Opcional: acesso ao PostgreSQL por ferramentas na própria máquina.
+services:
+  database:
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"

@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 public record SoilAnalysisRequest(
         @DecimalMin(value = "0.0", message = "pH CaCl2 não pode ser negativo")
         @DecimalMax(value = "14.0", message = "pH CaCl2 não pode ser maior que 14")
+        @jakarta.validation.constraints.Digits(integer = 2, fraction = 4)
         BigDecimal phCaCl2,
 
         @PositiveOrZero(message = "Matéria orgânica não pode ser negativa")
@@ -62,6 +63,7 @@ public record SoilAnalysisRequest(
 
         @DecimalMin(value = "0.0", message = "V informado não pode ser negativo")
         @DecimalMax(value = "100.0", message = "V informado não pode ser maior que 100")
+        @jakarta.validation.constraints.Digits(integer = 3, fraction = 10)
         BigDecimal baseSatReported,
 
         @DecimalMin(value = "0.0", message = "Argila não pode ser negativa")
@@ -77,6 +79,7 @@ public record SoilAnalysisRequest(
         BigDecimal silt,
         java.util.Map<String, String> units,
         @DecimalMin(value = "0.0", inclusive = false, message = "Densidade deve ser maior que zero")
+        @jakarta.validation.constraints.Digits(integer = 14, fraction = 10)
         BigDecimal density,
         String phosphorusMethod
 ) {

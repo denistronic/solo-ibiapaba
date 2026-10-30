@@ -64,8 +64,17 @@ public class InterpretationParameterService {
     private String normalize(String crop) {
         if (crop == null || crop.isBlank() || crop.strip().length() > 120)
             throw new IllegalArgumentException("Informe uma cultura com até 120 caracteres.");
-        return Normalizer.normalize(crop.strip(), Normalizer.Form.NFD)
+        String normalized = Normalizer.normalize(crop.strip(), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) throw new IllegalArgumentException("Informe um nome de cultura válido.");
+        return normalized;
+    }
+
+    @Transactional(readOnly = true)
+    public String requireCulture(String crop) {
+        return cultureRepository.findById(normalize(crop))
+                .map(InterpretationCulture::getDisplayName)
+                .orElseThrow(() -> new IllegalArgumentException("Selecione uma cultura cadastrada e salva na tela Parâmetros."));
     }
 
     @Transactional(readOnly = true)
@@ -123,7 +132,7 @@ public class InterpretationParameterService {
         }
 
         String displayName = crop.strip();
-        cultureRepository.save(new InterpretationCulture(normalized, displayName));
+        cultureRepository.saveAndFlush(new InterpretationCulture(normalized, displayName));
         return replaceParameters(normalized, displayName, parameters);
     }
 
@@ -136,7 +145,7 @@ public class InterpretationParameterService {
             if (existingCulture.isPresent()) {
                 displayName = existingCulture.get().getDisplayName();
             } else {
-                cultureRepository.save(new InterpretationCulture(normalized, displayName));
+                cultureRepository.saveAndFlush(new InterpretationCulture(normalized, displayName));
             }
         }
         return replaceParameters(normalized, displayName, parameters);
@@ -158,6 +167,12 @@ public class InterpretationParameterService {
                 if (stripped.scale() > 10 || stripped.precision() - stripped.scale() > 14)
                     throw new IllegalArgumentException("Limite fora da precisão permitida: " + range.indicator());
             }
+            String unit = DEFINITIONS.stream().filter(d -> d.indicator().equals(range.indicator())).findFirst().orElseThrow().unit();
+            BigDecimal ceiling = unit.equals("%") ? new BigDecimal("100")
+                    : unit.equals("g/kg") ? new BigDecimal("1000")
+                    : range.indicator().equals("pH em água (calculado)") ? new BigDecimal("14") : null;
+            if (ceiling != null && range.maximum().compareTo(ceiling) > 0)
+                throw new IllegalArgumentException("Limite acima do máximo físico permitido: " + range.indicator());
             entities.add(new InterpretationParameter(normalized, range.indicator(), range.minimum(), range.maximum()));
         }
         repository.deleteByCrop(normalized);

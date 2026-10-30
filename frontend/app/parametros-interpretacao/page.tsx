@@ -6,10 +6,11 @@ import { Settings } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { boundedDecimal, compareDecimal, decimal, rangeMaximum } from "@/lib/validation";
 import { request } from "@/lib/api";
 import styles from "./parametros.module.css";
 
-type Parameter = { indicator: string; unit: string; minimum: number | null; maximum: number | null };
+type Parameter = { indicator: string; unit: string; minimum: number | string | null; maximum: number | string | null };
 type Profile = { crop: string; parameters: Parameter[] };
 type Row = { indicator: string; unit: string; minimum: string; maximum: string };
 type ScreenMode = "empty" | "view" | "edit" | "create";
@@ -17,8 +18,8 @@ type ScreenMode = "empty" | "view" | "edit" | "create";
 const rowsFrom = (profile: Profile): Row[] => profile.parameters.map((parameter) => ({
   indicator: parameter.indicator,
   unit: parameter.unit,
-  minimum: parameter.minimum === null ? "" : String(parameter.minimum),
-  maximum: parameter.maximum === null ? "" : String(parameter.maximum),
+  minimum: parameter.minimum === null ? "" : decimal(parameter.minimum, parameter.indicator),
+  maximum: parameter.maximum === null ? "" : decimal(parameter.maximum, parameter.indicator),
 }));
 
 const cultureKey = (value: string) => value.trim().normalize("NFD")
@@ -142,15 +143,18 @@ export default function InterpretationParametersPage() {
       setError("Essa cultura já existe. Selecione-a na lista para carregar seus indicadores.");
       return;
     }
-    for (const row of rows) {
-      if (row.minimum === "" && row.maximum === "") continue;
-      if (row.minimum === "" || row.maximum === "" ||
-        !Number.isFinite(Number(row.minimum)) || !Number.isFinite(Number(row.maximum)) ||
-        Number(row.minimum) < 0 || Number(row.minimum) > Number(row.maximum)) {
-        setError(`Revise ${row.indicator}: informe os dois limites, com mínimo menor ou igual ao máximo.`);
-        return;
-      }
-    }
+    let parameters;
+    try {
+      parameters = rows.map(row => {
+        if (row.minimum === "" && row.maximum === "") return { indicator: row.indicator, minimum: null, maximum: null };
+        if (row.minimum === "" || row.maximum === "") throw new Error(`Informe os dois limites de ${row.indicator}.`);
+        const max = rangeMaximum(row.indicator, row.unit);
+        const minimum = boundedDecimal(row.minimum, `Mínimo de ${row.indicator}`, { max });
+        const maximum = boundedDecimal(row.maximum, `Máximo de ${row.indicator}`, { max });
+        if (compareDecimal(minimum, maximum) > 0) throw new Error(`Revise ${row.indicator}: mínimo maior que máximo.`);
+        return { indicator: row.indicator, minimum, maximum };
+      });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Revise os limites informados."); return; }
 
     setBusy(true);
     try {
@@ -158,11 +162,7 @@ export default function InterpretationParametersPage() {
         method: mode === "create" ? "POST" : "PUT",
         body: JSON.stringify({
           crop: cropToSave,
-          parameters: rows.map((row) => ({
-            indicator: row.indicator,
-            minimum: row.minimum === "" ? null : Number(row.minimum),
-            maximum: row.maximum === "" ? null : Number(row.maximum),
-          })),
+          parameters,
         }),
       });
       setRows(rowsFrom(profile));
@@ -271,11 +271,11 @@ export default function InterpretationParametersPage() {
                       <th scope="row">{row.indicator}</th>
                       <td>{row.unit || "—"}</td>
                       <td>{editing ? <input aria-label={`Mínimo de ${row.indicator}`} className={styles.rangeInput}
-                        type="number" step="any" min="0" value={row.minimum} disabled={busy}
+                        type="number" step="any" min="0" max={rangeMaximum(row.indicator, row.unit)} value={row.minimum} disabled={busy}
                         onChange={(event) => editRow(index, "minimum", event.target.value)} />
                         : <span className={styles.rangeValue}>{row.minimum || "—"}</span>}</td>
                       <td>{editing ? <input aria-label={`Máximo de ${row.indicator}`} className={styles.rangeInput}
-                        type="number" step="any" min="0" value={row.maximum} disabled={busy}
+                        type="number" step="any" min="0" max={rangeMaximum(row.indicator, row.unit)} value={row.maximum} disabled={busy}
                         onChange={(event) => editRow(index, "maximum", event.target.value)} />
                         : <span className={styles.rangeValue}>{row.maximum || "—"}</span>}</td>
                     </tr>

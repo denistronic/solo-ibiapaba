@@ -1,7 +1,7 @@
 package br.com.soloibiapaba.domain;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -15,7 +15,7 @@ public class User {
     @Column(nullable = false, length = 120)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 180)
+    @Column(nullable = false, length = 180)
     private String email;
 
     @Column(name = "password_hash", nullable = false)
@@ -29,7 +29,7 @@ public class User {
     private boolean active = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private Instant createdAt = Instant.now();
 
     protected User() {
         // exigido pelo JPA
@@ -86,7 +86,7 @@ public class User {
         this.active = active;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 }

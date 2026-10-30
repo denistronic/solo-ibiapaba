@@ -2,7 +2,6 @@ package br.com.soloibiapaba.service;
 
 import br.com.soloibiapaba.domain.SoilAnalysis;
 import java.math.BigDecimal;
-import java.math.MathContext;
 import java.util.Map;
 import java.util.Set;
 
@@ -10,13 +9,29 @@ import java.util.Set;
 public final class SoilUnits {
     private SoilUnits() {}
 
-    public static SoilAnalysis normalize(SoilAnalysis a) {
-        if (a.units() != null) {
-            Set<String> supported = Set.of("calcium", "magnesium", "potassium", "sodium", "aluminum", "hAl", "cecReported", "organicMatter", "organicCarbon", "phosphorus", "sulfur", "boron", "copper", "iron", "manganese", "zinc", "clay", "sand", "silt");
-            if (!supported.containsAll(a.units().keySet())) {
-                throw new IllegalArgumentException("Parâmetro de unidade desconhecido.");
-            }
+    /** Completa unidades omitidas com o contrato integrado, sem converter valores armazenados. */
+    public static Map<String,String> effectiveUnits(Map<String,String> supplied) {
+        var result = new java.util.LinkedHashMap<String,String>();
+        for (String key : java.util.List.of("organicMatter", "organicCarbon", "phosphorus", "sulfur", "boron", "copper", "iron", "manganese", "zinc")) result.put(key, "g/dm³");
+        for (String key : java.util.List.of("calcium", "magnesium", "potassium", "sodium", "aluminum", "hAl", "cecReported")) result.put(key, "mmolc/dm³");
+        for (String key : java.util.List.of("clay", "sand", "silt")) result.put(key, "g/kg");
+        if (supplied != null) {
+            supplied.forEach((key,unit) -> {
+                if (key == null || !result.containsKey(key) || unit == null)
+                    throw new IllegalArgumentException("Parâmetro ou unidade desconhecido.");
+                result.put(key, unit);
+            });
         }
+        return Map.copyOf(result);
+    }
+
+    public static SoilAnalysis normalize(SoilAnalysis a) {
+        effectiveUnits(a.units());
+        bounded(a.phWater(), BigDecimal.ZERO, new BigDecimal("14.6"), "pH em água");
+        bounded(a.phCaCl2(), BigDecimal.ZERO, new BigDecimal("14"), "pH CaCl2");
+        bounded(a.baseSatReported(), BigDecimal.ZERO, new BigDecimal("100"), "V informado");
+        if (a.density() != null && a.density().signum() <= 0)
+            throw new IllegalArgumentException("Densidade deve ser maior que zero.");
         if (a.phosphorusMethod() != null && !Set.of("Resina", "Mehlich 1", "Não informado").contains(a.phosphorusMethod())) {
             throw new IllegalArgumentException("Método de fósforo inválido.");
         }
@@ -46,7 +61,17 @@ public final class SoilUnits {
             Map.of(), null, a.phosphorusMethod());
     }
 
+    private static void bounded(BigDecimal value, BigDecimal minimum, BigDecimal maximum, String field) {
+        if (value != null && (value.compareTo(minimum) < 0 || value.compareTo(maximum) > 0))
+            throw new IllegalArgumentException("Resultado fora do intervalo permitido para " + field);
+    }
+
     private static BigDecimal convert(String field, BigDecimal value, SoilAnalysis a, String group) {
+        if (value != null) {
+            var exact = value.stripTrailingZeros();
+            if (exact.scale() > 10 || exact.precision() - exact.scale() > 14)
+                throw new IllegalArgumentException("Valor fora da precisão permitida para " + field);
+        }
         String fallback = switch (group) {
             case "charge" -> "mmolc/dm³";
             case "texture" -> "g/kg";
@@ -81,7 +106,7 @@ public final class SoilUnits {
             }
         }
         if (value == null) return null;
-        BigDecimal result = value.multiply(factor, MathContext.DECIMAL128);
+        BigDecimal result = value.multiply(factor);
         if (result.signum() < 0 || (group.equals("texture") && result.compareTo(new BigDecimal("1000")) > 0)) {
             throw new IllegalArgumentException("Resultado fora do intervalo permitido para " + field);
         }

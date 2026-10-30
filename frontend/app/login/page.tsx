@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { passwordError } from "@/lib/validation";
 import { ApiError } from "@/lib/api";
 import styles from "./login.module.css";
 
@@ -25,6 +26,8 @@ export default function LoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    const invalidPassword = passwordError(password, false);
+    if (invalidPassword) { setError(invalidPassword); return; }
     setSubmitting(true);
 
     try {
@@ -66,6 +69,7 @@ export default function LoginPage() {
               id="email"
               name="email"
               type="email"
+              maxLength={180}
               autoComplete="username"
               required
               value={email}

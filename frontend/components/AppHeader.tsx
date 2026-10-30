@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { History, LogOut, UsersRound, SlidersHorizontal } from "lucide-react";
+import { History, ClipboardList, LogOut, UsersRound, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 
@@ -58,6 +58,12 @@ export default function AppHeader() {
         >
           <SlidersHorizontal size={22} />
         </Button>
+        {user.role === "ADMIN" && (
+          <Button className="home-icon-button" variant="outline" size="icon"
+            aria-label="Auditoria de registros" title="Auditoria de registros" onClick={() => router.push("/admin/auditoria")}>
+            <ClipboardList size={22} />
+          </Button>
+        )}
         {user.role === "ADMIN" && (
           <Button
             className="home-icon-button"

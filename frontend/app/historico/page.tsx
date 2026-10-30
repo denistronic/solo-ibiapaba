@@ -20,6 +20,7 @@ import { toast, Toaster } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import AppHeader from "@/components/AppHeader";
 import { ApiError, listSamples } from "@/lib/api";
+import { hasSavedAnalysis } from "@/lib/sample-permissions";
 import type { Sample } from "@/lib/soil";
 import styles from "./historico.module.css";
 
@@ -95,7 +96,8 @@ export default function HistoricoPage() {
   const [toDate, setToDate] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("sampledAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ signature: "", page: 1 });
+  const filterSignature = JSON.stringify([query, status, crop, plot, fromDate, toDate, sortKey, sortDirection]);
   const [preview, setPreview] = useState<Sample | null>(null);
   const [samplePendingLaudo, setSamplePendingLaudo] = useState<Sample | null>(null);
 
@@ -117,7 +119,6 @@ export default function HistoricoPage() {
     void load();
   }, [user]);
 
-  useEffect(() => setPage(1), [query, status, crop, plot, fromDate, toDate, sortKey, sortDirection]);
 
   // Fecha os modais com a tecla Esc.
   useEffect(() => {
@@ -144,10 +145,10 @@ export default function HistoricoPage() {
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const result = samples.filter((sample) => {
-      const searchable = `${sample.code} ${sample.block} ${sample.plot} ${sample.row} ${sample.crop}`.toLowerCase();
+      const searchable = `${sample.code} ${sample.serviceOrderNumber ?? ""} ${sample.block} ${sample.plot} ${sample.row} ${sample.crop}`.toLowerCase();
       return (
         (!normalizedQuery || searchable.includes(normalizedQuery)) &&
-        (status === "todos" || (status === "analisadas" ? Boolean(sample.analysis) : !sample.analysis)) &&
+        (status === "todos" || (status === "analisadas" ? hasSavedAnalysis(sample) : !hasSavedAnalysis(sample))) &&
         (crop === "todas" || sample.crop === crop) &&
         (plot === "todas" || sample.plot === plot) &&
         (!fromDate || sample.sampledAt >= fromDate) &&
@@ -166,7 +167,10 @@ export default function HistoricoPage() {
   const analyzedCount = samples.filter((sample) => sample.analysis).length;
   const pendingCount = samples.length - analyzedCount;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
+  const currentPage = Math.min(pagination.signature === filterSignature ? pagination.page : 1, totalPages);
+  function setPage(value: number | ((current: number) => number)) {
+    setPagination(previous => ({ signature: filterSignature, page: typeof value === "function" ? value(previous.signature === filterSignature ? previous.page : 1) : value }));
+  }
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const startItem = filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
   const endItem = Math.min(currentPage * PAGE_SIZE, filtered.length);
@@ -191,7 +195,7 @@ export default function HistoricoPage() {
   }
 
   function handleOpenSample(sample: Sample) {
-    if (sample.analysis) {
+    if (hasSavedAnalysis(sample)) {
       // Laudo preenchido: seguir para interpretação.
       router.push(`/?sample=${sample.id}`);
       return;
@@ -283,7 +287,7 @@ export default function HistoricoPage() {
                 <input
                   id="search-filter"
                   className={`${styles.control} ${styles.controlWithIcon}`}
-                  placeholder="Código, bloco, quadra, linha ou cultura"
+                  placeholder="Código, OS, bloco, quadra, linha ou cultura"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                 />
@@ -407,7 +411,7 @@ export default function HistoricoPage() {
                 )}
                 {!loading && pageItems.map((sample) => (
                   <tr key={sample.id}>
-                    <td><strong className={styles.code}>{sample.code}</strong></td>
+                    <td><strong className={styles.code}>{sample.code}</strong>{sample.serviceOrderNumber && <small className={styles.serviceOrder}>OS-{sample.serviceOrderNumber}</small>}</td>
                     <td>{formatDate(sample.sampledAt)}</td>
                     <td>
                       <span className={styles.location}>
@@ -417,7 +421,7 @@ export default function HistoricoPage() {
                     </td>
                     <td>{sample.crop}</td>
                     <td>{sample.depth}</td>
-                    <td><StatusBadge analyzed={Boolean(sample.analysis)} /></td>
+                    <td><StatusBadge analyzed={hasSavedAnalysis(sample)} /></td>
                     <td>
                       <div className={styles.actions}>
                         <button
@@ -517,7 +521,7 @@ export default function HistoricoPage() {
 
             <div className={styles.modalBody}>
               <div className={styles.previewStatus}>
-                <StatusBadge analyzed={Boolean(preview.analysis)} />
+                <StatusBadge analyzed={hasSavedAnalysis(preview)} />
               </div>
               <div className={styles.previewGrid}>
                 <div><span>Data da coleta</span><strong>{formatDate(preview.sampledAt)}</strong></div>
@@ -540,7 +544,7 @@ export default function HistoricoPage() {
                 onClick={() => {
                   setPreview(null);
                   router.push(
-                    `/?sample=${encodeURIComponent(preview.id)}&view=${preview.analysis ? "relatorio" : "analise"}`,
+                    `/?sample=${encodeURIComponent(preview.id)}&view=${hasSavedAnalysis(preview) ? "relatorio" : "analise"}`,
                   );
                 }}
               >

@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { UserRoundPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { passwordError } from "@/lib/validation";
 import { ApiError } from "@/lib/api";
 import AppHeader from "@/components/AppHeader";
 import {
@@ -17,7 +18,7 @@ import type { UserRole } from "@/lib/auth";
 import styles from "./usuarios.module.css";
 
 export default function AdminUsuariosPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
 
   // Só ADMIN pode ver essa tela. Quem não é admin (ou não está logado)
@@ -62,8 +63,11 @@ export default function AdminUsuariosPage() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setCreating(true);
+    if (creating) return;
     setCreateError(null);
+    const invalidPassword = passwordError(newPassword);
+    if (invalidPassword) { setCreateError(invalidPassword); return; }
+    setCreating(true);
 
     try {
       await createUser({
@@ -92,6 +96,7 @@ export default function AdminUsuariosPage() {
   const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState<UserRole>("USER");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
   const [rowError, setRowError] = useState<string | null>(null);
 
   function startEdit(target: ManagedUser) {
@@ -111,24 +116,32 @@ export default function AdminUsuariosPage() {
     setSavingEdit(true);
     setRowError(null);
     try {
+      if (!editName.trim() || !editEmail.trim()) throw new Error("Informe nome e e-mail.");
       await updateUser(id, { name: editName, email: editEmail, role: editRole });
       setEditingId(null);
+      if (id === user?.id) {
+        const current = await refreshUser();
+        if (current.role !== "ADMIN") return;
+      }
       await reload();
     } catch (err) {
-      setRowError(err instanceof ApiError ? err.message : "Não foi possível salvar.");
+      setRowError(err instanceof Error ? err.message : "Não foi possível salvar.");
     } finally {
       setSavingEdit(false);
     }
   }
 
   async function toggleStatus(target: ManagedUser) {
+    if (statusBusy) return;
     setRowError(null);
+    setStatusBusy(true);
     try {
       await updateUserStatus(target.id, !target.active);
+      if (target.id === user?.id) await refreshUser();
       await reload();
     } catch (err) {
       setRowError(err instanceof ApiError ? err.message : "Não foi possível alterar o status.");
-    }
+    } finally { setStatusBusy(false); }
   }
 
   if (authLoading || !user || user.role !== "ADMIN") {
@@ -177,6 +190,7 @@ export default function AdminUsuariosPage() {
             <input
               type="text"
               name="name"
+              maxLength={120}
               autoComplete="name"
               required
               placeholder="Nome"
@@ -188,6 +202,7 @@ export default function AdminUsuariosPage() {
             <input
               type="email"
               name="email"
+              maxLength={180}
               autoComplete="email"
               required
               placeholder="E-mail"
@@ -199,6 +214,9 @@ export default function AdminUsuariosPage() {
             <input
               type="password"
               name="password"
+              minLength={8}
+              maxLength={72}
+              aria-describedby="password-help"
               autoComplete="new-password"
               required
               placeholder="Senha"
@@ -218,6 +236,7 @@ export default function AdminUsuariosPage() {
               <option value="ADMIN">Administrador</option>
             </select>
 
+            <p id="password-help" className={styles.passwordHelp}>Senha com pelo menos 8 caracteres e até 72 bytes UTF-8.</p>
             {createError && (
               <p className={styles.createError} role="alert">
                 {createError}
@@ -262,6 +281,8 @@ export default function AdminUsuariosPage() {
                           <td>
                             <input
                               aria-label={`Nome de ${target.name}`}
+                              maxLength={120}
+                              required
                               value={editName}
                               onChange={(event) => setEditName(event.target.value)}
                               className={styles.tableInput}
@@ -271,6 +292,8 @@ export default function AdminUsuariosPage() {
                             <input
                               aria-label={`E-mail de ${target.name}`}
                               type="email"
+                              maxLength={180}
+                              required
                               value={editEmail}
                               onChange={(event) => setEditEmail(event.target.value)}
                               className={styles.tableInput}
@@ -334,6 +357,7 @@ export default function AdminUsuariosPage() {
                               <button
                                 type="button"
                                 onClick={() => toggleStatus(target)}
+                                disabled={statusBusy}
                                 className={styles.actionButton}
                               >
                                 {target.active ? "Desativar" : "Ativar"}

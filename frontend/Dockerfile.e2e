@@ -1,0 +1,9 @@
+# Somente para a suíte descartável; não integra a imagem de produção.
+FROM mcr.microsoft.com/playwright:v1.62.1-noble
+WORKDIR /tests
+ENV CI=1
+COPY package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY tests ./tests
+COPY lib/validation.ts ./lib/validation.ts
+CMD ["npm", "run", "test:e2e"]

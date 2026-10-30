@@ -21,7 +21,9 @@ public record SampleResponse(
         Instant createdAt,
         SoilAnalysis analysis,
         Instant analysisUpdatedAt,
-        String observations
+        String observations,
+        long recordVersion, UUID createdBy, UUID updatedBy, Instant updatedAt,
+        UUID analysisCreatedBy, Instant analysisCreatedAt, UUID analysisUpdatedBy
 ) {
     public static SampleResponse from(Sample sample) {
         return new SampleResponse(
@@ -38,7 +40,9 @@ public record SampleResponse(
                 sample.createdAt(),
                 sample.analysis(),
                 sample.analysisUpdatedAt(),
-                sample.observations()
+                sample.observations(),
+                sample.tracking().recordVersion(), sample.tracking().createdBy(), sample.tracking().updatedBy(), sample.tracking().updatedAt(),
+                sample.tracking().analysisCreatedBy(), sample.tracking().analysisCreatedAt(), sample.tracking().analysisUpdatedBy()
         );
     }
 }

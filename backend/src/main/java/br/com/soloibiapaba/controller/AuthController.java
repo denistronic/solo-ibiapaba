@@ -30,7 +30,7 @@ public class AuthController {
 
     @GetMapping("/me")
     public UserResponse me(@AuthenticationPrincipal UserDetails principal) {
-        User user = userRepository.findByEmail(principal.getUsername())
+        User user = userRepository.findByEmailIgnoreCase(principal.getUsername())
                 .orElseThrow(() -> new IllegalStateException("Usuário autenticado não encontrado"));
 
         return new UserResponse(user.getId(), user.getName(), user.getEmail(),

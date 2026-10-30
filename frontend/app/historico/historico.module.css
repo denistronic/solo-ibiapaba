@@ -855,3 +855,5 @@
     width: 100%;
   }
 }
+
+.serviceOrder { display: block; margin-top: 4px; color: #53665b; font-size: 0.75rem; }

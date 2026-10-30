@@ -36,6 +36,7 @@ public record CreateSampleRequest(
         @NotNull(message = "Temperatura é obrigatória")
         @DecimalMin(value = "-20.0", message = "Temperatura abaixo do limite aceito")
         @DecimalMax(value = "80.0", message = "Temperatura acima do limite aceito")
+        @jakarta.validation.constraints.Digits(integer = 2, fraction = 2, message = "Temperatura deve ter no máximo duas casas decimais")
         BigDecimal temperature,
 
         @NotBlank(message = "Profundidade é obrigatória")

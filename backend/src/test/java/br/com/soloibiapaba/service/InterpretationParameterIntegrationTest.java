@@ -11,7 +11,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 
-@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:parameter-test;DB_CLOSE_DELAY=-1")
+@SpringBootTest
+@org.springframework.test.context.ActiveProfiles("test")
 @TestExecutionListeners(listeners = DependencyInjectionTestExecutionListener.class, inheritListeners = false)
 class InterpretationParameterIntegrationTest {
     @Autowired InterpretationParameterService parameters;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ClipboardPlus,
   FlaskConical,
@@ -12,6 +12,10 @@ import {
 import { toast, Toaster } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation"; // NOVO (Fase 4)
 import { useAuth } from "@/context/AuthContext"; // NOVO (Fase 4)
+import { analysisDraft, buildAnalysisPayload } from "@/lib/analysis";
+import { hasSavedAnalysis, canWriteAnalysis } from "@/lib/sample-permissions";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { boundedDecimal, businessDate } from "@/lib/validation";
 import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +35,8 @@ import {
   ApiError,
   createSample as createSampleApi,
   getHealth,
+  getSample,
+  updateSample,
   getInterpretation,
   listSamples,
   request,
@@ -50,17 +56,21 @@ const makeEmptyMeta = () => ({
   plot: "",
   row: "",
   crop: "",
-  sampledAt: new Date().toISOString().slice(0, 10),
+  sampledAt: businessDate(),
   temperature: "",
   observations: "",
   depth: "0–20 cm",
 });
 
-const makeEmptyAnalysis = () =>
-  Object.fromEntries(ANALYSIS_FIELDS.map((field) => [field.key, ""])) as SoilAnalysis;
+function metaFromSample(sample: Sample) {
+  return { serviceOrderNumber: sample.serviceOrderNumber ?? "", block: sample.block, plot: sample.plot, row: sample.row,
+    crop: sample.crop, sampledAt: sample.sampledAt, temperature: sample.temperature ?? "", observations: sample.observations ?? "", depth: sample.depth };
+}
+
+const makeEmptyAnalysis = () => analysisDraft();
 
 function messageFromError(error: unknown, fallback: string) {
-  return error instanceof ApiError ? error.message : fallback;
+  return error instanceof Error ? error.message : fallback;
 }
 
 function StatusPill({ level }: { level: string }) {
@@ -73,9 +83,13 @@ function StatusPill({ level }: { level: string }) {
   return <span className={`status status-${slug}`}>{level}</span>;
 }
 
-export default function Home() {
+export default function HomePage() {
+  return <Suspense fallback={<main className="flex min-h-screen items-center justify-center">Carregando...</main>}><Home /></Suspense>;
+}
+
+function Home() {
   // NOVO (Fase 4): pega o usuário logado e a função de logout do contexto
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const sampleIdParam = searchParams.get("sample");
@@ -93,6 +107,21 @@ export default function Home() {
   const [tab, setTab] = useState("cadastro");
   const [online, setOnline] = useState(false);
   const [loadingSamples, setLoadingSamples] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savingMeta, setSavingMeta] = useState(false);
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [openFailed, setOpenFailed] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  const [draftVersion, setDraftVersion] = useState<Sample["recordVersion"]>("");
+  const [confirmation, setConfirmation] = useState<"first" | "reload" | null>(null);
+  const [pendingAnalysis, setPendingAnalysis] = useState<SoilAnalysis | null>(null);
+  const selectionRequest = useRef(0);
+  const [formError, setFormError] = useState("");
+  const reportRequest = useRef(0);
+  const selectedRef = useRef<string | null>(null);
+  const busyRef = useRef(false);
 
   // NOVO (Fase 4): se não estiver logado (e já terminou de checar), manda pro /login
   useEffect(() => {
@@ -101,23 +130,11 @@ export default function Home() {
     }
   }, [authLoading, user, router]);
 
-  // Seleciona automaticamente a amostra passada via parâmetro de URL (ex: vindas do histórico)
-  useEffect(() => {
-    if (sampleIdParam && samples.length > 0) {
-      const targetSample = samples.find((s) => s.id === sampleIdParam);
-      if (targetSample) {
-        void chooseSample(targetSample);
-      }
-    }
-  }, [sampleIdParam, samples]);
-
-  // NOVO (Fase 5): função chamada pelo botão "Sair"
-  function handleLogout() {
-    logout();
-    router.push("/login");
-  }
-
   const selected = samples.find((sample) => sample.id === selectedId) ?? null;
+  const savedAnalysis = hasSavedAnalysis(selected);
+  const analysisWritable = canWriteAnalysis(user?.role, selected);
+  const writing = creating || saving || savingMeta;
+  const fieldsBlocked = writing || opening || openFailed || conflict;
   const filtered = useMemo(
     () =>
       samples.filter((sample) =>
@@ -129,6 +146,7 @@ export default function Home() {
   );
 
   useEffect(() => {
+    if (authLoading || !user) return;
     let cancelled = false;
 
     request<string[]>("/interpretation-parameters/cultures")
@@ -151,42 +169,50 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authLoading, user]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
+    let cancelled = false;
     async function bootstrap() {
       try {
         await getHealth();
         const data = await listSamples();
-        setSamples(data);
-        setOnline(true);
-      } catch {
-        setOnline(false);
+        if (!cancelled) { setSamples(data); setOnline(true); }
+      } catch (error) {
+        if (!cancelled) { setOnline(false); setFormError(messageFromError(error, "Não foi possível carregar as amostras.")); }
       } finally {
-        setLoadingSamples(false);
+        if (!cancelled) setLoadingSamples(false);
       }
     }
 
     void bootstrap();
-  }, []);
+    return () => { cancelled = true; };
+  }, [authLoading, user]);
 
-  async function loadReport(sampleId: string) {
+  const loadReport = useCallback(async (sampleId: string) => {
+    const ticket = ++reportRequest.current;
     setReportLoading(true);
     try {
       const data = await getInterpretation(sampleId);
+      if (ticket !== reportRequest.current) return null;
       setReport(data);
       return data;
     } catch (error) {
-      setReport(null);
-      toast.error(messageFromError(error, "Não foi possível carregar a interpretação."));
+      if (ticket === reportRequest.current) {
+        setReport(null);
+        toast.error(messageFromError(error, "Não foi possível carregar a interpretação."));
+      }
       return null;
     } finally {
-      setReportLoading(false);
+      if (ticket === reportRequest.current) setReportLoading(false);
     }
-  }
+  }, []);
 
   async function createSample(event: React.FormEvent) {
     event.preventDefault();
+    if (busyRef.current) return;
+    setFormError("");
 
     // A cultura precisa existir no catálogo persistido, carregado de Parâmetros.
     if (culturesLoading) {
@@ -203,83 +229,128 @@ export default function Home() {
     }
 
     try {
+      const temperature = boundedDecimal(meta.temperature, "Temperatura", { min: "-20", max: "80", integer: 2, fraction: 2 });
+      busyRef.current = true;
+      setCreating(true);
       const sample = await createSampleApi({
         ...meta,
-        temperature: Number(meta.temperature),
+        temperature,
       });
       setSamples((current) => [sample, ...current]);
+      selectedRef.current = sample.id;
+      reportRequest.current++;
       setSelectedId(sample.id);
+      router.replace(`/?sample=${sample.id}`);
       setAnalysis(makeEmptyAnalysis());
       setReport(null);
-      setMeta(makeEmptyMeta());
+      setMeta(metaFromSample(sample)); setDraftVersion(sample.recordVersion);
+      setEditingMeta(false); setConflict(false); setOpenFailed(false);
       setOnline(true);
       setTab("analise");
       toast.success(`Amostragem ${sample.code} cadastrada`);
     } catch (error) {
-      setOnline(false);
+      if (error instanceof ApiError && (error.status === 0 || error.status >= 500)) setOnline(false);
+      setFormError(messageFromError(error, "Não foi possível cadastrar a amostra."));
       toast.error(
         messageFromError(
           error,
-          "Não foi possível cadastrar. Verifique o backend Spring Boot.",
+          "Não foi possível cadastrar a amostra. Tente novamente.",
         ),
       );
+    } finally { busyRef.current = false; setCreating(false); }
+  }
+
+  function mutationError(error: unknown, fallback: string) {
+    let message = messageFromError(error, fallback);
+    if (error instanceof ApiError && (error.status === 409 || error.status === 428)) {
+      setConflict(true);
+      message = `${message} Seu rascunho continua nesta tela. Reabra o registro para conferir a versão atual; ele não será sobrescrito automaticamente.`;
     }
+    if (error instanceof ApiError && error.status === 403) void refreshUser().catch(() => {});
+    setFormError(message); toast.error(message);
   }
 
   async function saveAnalysis(event: React.FormEvent) {
     event.preventDefault();
-    if (!selectedId) return;
-
-    const units = analysis.units ?? {};
-    const needsDensity = ANALYSIS_FIELDS.some((field) =>
-      field.unit === "g/dm³" && units[field.key]?.endsWith("/kg") &&
-      analysis[field.key] !== "" && analysis[field.key] != null,
-    );
-    if (needsDensity && !(Number(analysis.density) > 0)) {
-      toast.error("Informe a densidade de conversão para resultados por massa (g/kg ou mg/kg).");
-      return;
-    }
-    const numeric = {
-      ...Object.fromEntries(ANALYSIS_FIELDS.map(({ key }) => [
-        key, analysis[key] === "" || analysis[key] == null ? null : Number(analysis[key]),
-      ])),
-      units,
-      density: analysis.density === "" || analysis.density == null ? null : Number(analysis.density),
-      phosphorusMethod: analysis.phosphorusMethod ?? "Resina",
-    } as SoilAnalysis;
-
+    if (!selected || !analysisWritable || fieldsBlocked || busyRef.current) return;
+    setFormError("");
     try {
-      const updated = await updateAnalysis(selectedId, numeric);
-      setSamples((current) =>
-        current.map((sample) => (sample.id === selectedId ? updated : sample)),
-      );
-      setAnalysis({ ...makeEmptyAnalysis(), ...(updated.analysis ?? {}) });
-      setOnline(true);
-
-      const interpreted = await loadReport(selectedId);
-      if (interpreted) {
-        setTab("relatorio");
-        toast.success("Laudo salvo e interpretado pelo backend Java");
+      const numeric = buildAnalysisPayload(analysis);
+      if (user?.role === "USER" && !hasSavedAnalysis(selected)) {
+        setPendingAnalysis(numeric); setConfirmation("first"); return;
       }
+      await performAnalysisSave(numeric);
+    } catch (error) { mutationError(error,"Não foi possível salvar o laudo."); }
+  }
+
+  async function performAnalysisSave(payload: SoilAnalysis) {
+    if (!selected || !analysisWritable || fieldsBlocked || busyRef.current) return;
+    const target = selected;
+    busyRef.current = true; setSaving(true); setConfirmation(null); setPendingAnalysis(null);
+    try {
+      const updated = await updateAnalysis(target.id, payload, draftVersion);
+      setSamples(current => current.map(sample => sample.id === target.id ? updated : sample));
+      setAnalysis(analysisDraft(updated.analysis)); setDraftVersion(updated.recordVersion); setOnline(true);
+      const interpreted = await loadReport(target.id);
+      if (interpreted) { setTab("relatorio"); toast.success("Laudo salvo e interpretação atualizada."); }
+    } catch (error) { mutationError(error,"Não foi possível salvar o laudo."); }
+    finally { busyRef.current = false; setSaving(false); }
+  }
+
+  async function saveMetadata(event: React.FormEvent) {
+    event.preventDefault();
+    if (!selected || user?.role !== "ADMIN" || !editingMeta || fieldsBlocked || busyRef.current) return;
+    setFormError("");
+    try {
+      if (!cultures.includes(meta.crop)) throw new Error("Selecione uma cultura cadastrada em Parâmetros.");
+      const temperature = boundedDecimal(meta.temperature,"Temperatura",{min:"-20",max:"80",integer:2,fraction:2});
+      busyRef.current = true; setSavingMeta(true);
+      const updated = await updateSample(selected.id,{...meta,temperature},draftVersion);
+      setSamples(current => current.map(sample => sample.id === updated.id ? updated : sample));
+      setMeta(metaFromSample(updated)); setDraftVersion(updated.recordVersion); setEditingMeta(false); setReport(null);
+      toast.success("Dados da amostra salvos.");
+      if (hasSavedAnalysis(updated)) await loadReport(updated.id);
+    } catch (error) { mutationError(error,"Não foi possível atualizar a amostra."); }
+    finally { busyRef.current = false; setSavingMeta(false); }
+  }
+
+  const chooseSample = useCallback(async (sample: Sample) => {
+    if (busyRef.current) return;
+    const ticket = ++selectionRequest.current;
+    selectedRef.current = sample.id; reportRequest.current++;
+    setReportLoading(false); setFormError(""); setSelectedId(sample.id); setEditingMeta(false);
+    setConflict(false); setOpenFailed(false); setOpening(true); setReport(null); setConfirmation(null); setPendingAnalysis(null);
+    setDraftVersion("");
+    setMeta(metaFromSample(sample)); setAnalysis(analysisDraft(sample.analysis));
+    if (new URLSearchParams(window.location.search).get("sample") !== sample.id) router.replace(`/?sample=${sample.id}`);
+    try {
+      const fresh = await getSample(sample.id);
+      if (ticket !== selectionRequest.current) return;
+      setSamples(current => current.map(item => item.id === fresh.id ? fresh : item));
+      setDraftVersion(fresh.recordVersion);
+      setMeta(metaFromSample(fresh)); setAnalysis(analysisDraft(fresh.analysis));
+      const requestedView = new URLSearchParams(window.location.search).get("view");
+      setTab(requestedView === "cadastro" || requestedView === "analise" ? requestedView : hasSavedAnalysis(fresh) ? "relatorio" : "analise");
+      if (hasSavedAnalysis(fresh)) await loadReport(fresh.id);
     } catch (error) {
-      toast.error(messageFromError(error, "Não foi possível salvar o laudo."));
-    }
-  }
+      if (ticket === selectionRequest.current) { setOpenFailed(true); setFormError(messageFromError(error,"Não foi possível reabrir a amostra.")); }
+    } finally { if (ticket === selectionRequest.current) setOpening(false); }
+  }, [loadReport, router]);
 
-  async function chooseSample(sample: Sample) {
-    setSelectedId(sample.id);
-    setAnalysis({ ...makeEmptyAnalysis(), ...(sample.analysis ?? {}) });
-    setReport(null);
-
-    if (sample.analysis) {
-      setTab("relatorio");
-      await loadReport(sample.id);
-    } else {
-      setTab("analise");
-    }
-  }
+  useEffect(() => {
+    if (!sampleIdParam || samples.length === 0 || selectedRef.current === sampleIdParam) return;
+    const target = samples.find(sample => sample.id === sampleIdParam);
+    if (target) void Promise.resolve().then(() => chooseSample(target));
+  }, [sampleIdParam, samples, chooseSample, saving, savingMeta, creating]);
 
   function startNewSample() {
+    if (busyRef.current) return;
+    selectionRequest.current++;
+    setOpening(false); setOpenFailed(false); setConflict(false); setEditingMeta(false); setConfirmation(null); setPendingAnalysis(null);
+    selectedRef.current = null;
+    reportRequest.current++;
+    setReportLoading(false); setFormError("");
+    if (sampleIdParam) router.replace("/");
     setSelectedId(null);
     setAnalysis(makeEmptyAnalysis());
     setReport(null);
@@ -332,6 +403,7 @@ export default function Home() {
               filtered.map((sample) => (
                 <button
                   key={sample.id}
+                  disabled={writing}
                   onClick={() => void chooseSample(sample)}
                   className={`sample-card ${selectedId === sample.id ? "selected" : ""}`}
                 >
@@ -348,8 +420,8 @@ export default function Home() {
                     {sample.crop} ·{" "}
                     {new Date(`${sample.sampledAt}T12:00:00`).toLocaleDateString("pt-BR")}
                   </span>
-                  <i className={sample.analysis ? "done" : "pending"}>
-                    {sample.analysis ? "Laudo analisado" : "Aguardando laudo"}
+                  <i className={hasSavedAnalysis(sample) ? "done" : "pending"}>
+                    {hasSavedAnalysis(sample) ? "Laudo analisado" : "Aguardando laudo"}
                   </i>
                 </button>
               ))}
@@ -360,7 +432,7 @@ export default function Home() {
           </div>
 
           <p className={`connection ${online ? "online" : "offline"}`}>
-            {online ? "Backend Java conectado" : "Backend Java desconectado"}
+            {online ? "Servidor conectado" : "Servidor indisponível"}
           </p>
         </aside>
 
@@ -379,6 +451,10 @@ export default function Home() {
             </span>
           </div>
 
+          {formError && <p role="alert" className="form-error">{formError}</p>}
+          {opening && <p role="status">Reabrindo a versão atual da amostra…</p>}
+          {selected && (conflict || openFailed) && <Button type="button" variant="outline" onClick={() => setConfirmation("reload")}>Reabrir registro atualizado</Button>}
+          {selected && user.role === "ADMIN" && <div className="no-print" style={{marginTop:12}}><Button type="button" variant="outline" onClick={() => router.push(`/admin/auditoria?sample=${encodeURIComponent(selected.id)}`)}>Auditoria desta amostra</Button></div>}
           <Tabs value={tab} onValueChange={setTab} className="workflow">
             <TabsList className="steps no-print">
               <TabsTrigger value="cadastro">
@@ -387,7 +463,7 @@ export default function Home() {
               <TabsTrigger value="analise" disabled={!selected}>
                 <b>02</b> Laudo
               </TabsTrigger>
-              <TabsTrigger value="relatorio" disabled={!selected?.analysis}>
+              <TabsTrigger value="relatorio" disabled={!savedAnalysis}>
                 <b>03</b> Interpretação
               </TabsTrigger>
             </TabsList>
@@ -401,7 +477,13 @@ export default function Home() {
                 </div>
               </div>
 
-              <form onSubmit={createSample} className="form-grid">
+              {selected && <div className="record-permissions">
+                <p>{editingMeta ? "Editando os dados da amostra." : "Dados cadastrados da amostra."} {!selected.createdBy && "Autoria não registrada."}</p>
+                {user.role === "ADMIN" && !editingMeta && <Button type="button" variant="outline" disabled={fieldsBlocked} onClick={() => setEditingMeta(true)}>Editar dados da amostra</Button>}
+                {user.role !== "ADMIN" && <p>Modo de consulta. Somente um administrador pode alterar estes dados.</p>}
+              </div>}
+              <form onSubmit={selected ? saveMetadata : createSample}>
+              <fieldset className="form-grid metadata-fields" disabled={fieldsBlocked || Boolean(selected && !editingMeta)}>
                 <div className="field field-serviceOrderNumber">
                   <div className="field-label-with-help">
                     <Label htmlFor="serviceOrderNumber">Número da OS</Label>
@@ -450,6 +532,7 @@ export default function Home() {
                                 ? "Escolha uma cultura"
                                 : "Cadastre uma cultura em Parâmetros"}
                         </NativeSelectOption>
+                        {selected && meta.crop && !cultures.includes(meta.crop) && <NativeSelectOption value={meta.crop}>{meta.crop} (histórico)</NativeSelectOption>}
                         {cultures.map((culture) => (
                           <NativeSelectOption key={culture} value={culture}>
                             {culture}
@@ -466,7 +549,10 @@ export default function Home() {
                               ? "number"
                               : "text"
                         }
-                        step={key === "temperature" ? "any" : undefined}
+                        step={key === "temperature" ? "0.01" : undefined}
+                        min={key === "temperature" ? -20 : undefined}
+                        max={key === "temperature" ? 80 : undefined}
+                        maxLength={["block", "plot", "row"].includes(key) ? 80 : undefined}
                         required
                         value={(meta as Record<string, string>)[key]}
                         placeholder={placeholder}
@@ -485,6 +571,7 @@ export default function Home() {
                     value={meta.depth}
                     onChange={(event) => setMeta({ ...meta, depth: event.target.value })}
                   >
+                    {!["0–20 cm","20–40 cm","40–60 cm"].includes(meta.depth) && <NativeSelectOption value={meta.depth}>{meta.depth}</NativeSelectOption>}
                     <NativeSelectOption value="0–20 cm">0–20 cm</NativeSelectOption>
                     <NativeSelectOption value="20–40 cm">20–40 cm</NativeSelectOption>
                     <NativeSelectOption value="40–60 cm">40–60 cm</NativeSelectOption>
@@ -504,8 +591,12 @@ export default function Home() {
                 </div>
 
                 <div className="form-actions sampling-actions">
-                  <Button type="submit">Gerar amostra e salvar</Button>
+                  {(!selected || editingMeta) && <>
+                    {selected && <Button type="button" variant="outline" onClick={() => { setMeta(metaFromSample(selected)); setEditingMeta(false); setFormError(""); }}>Cancelar edição</Button>}
+                    <Button type="submit" disabled={writing || culturesLoading || culturesError || cultures.length === 0}>{writing ? "Salvando..." : selected ? "Salvar dados da amostra" : "Gerar amostra e salvar"}</Button>
+                  </>}
                 </div>
+              </fieldset>
               </form>
             </TabsContent>
 
@@ -518,7 +609,13 @@ export default function Home() {
                 </div>
               </div>
 
+              {selected && savedAnalysis && !selected.analysisCreatedBy && <p className="method-note">Autoria inicial do laudo não registrada.</p>}
+              {!analysisWritable && <p className="permission-note">Laudo registrado — modo de consulta. Somente um administrador pode corrigir ou complementar os resultados.</p>}
+              {analysisWritable && user.role === "USER" && <p className="permission-note">Você pode registrar o primeiro laudo. Após salvar, inclusive com campos em branco, somente um administrador poderá alterar os resultados.</p>}
               <form onSubmit={saveAnalysis}>
+                {selected?.analysis?.phCaCl2 == null && selected?.analysis?.phWater != null && (
+                  <p className="method-note">pH em água do laudo original: {String(selected.analysis.phWater)}. O valor será preservado enquanto o pH em CaCl₂ permanecer em branco.</p>
+                )}
                 <div className="analysis-grid">
                   {ANALYSIS_FIELDS.map((field) => (
                     <div className="analysis-field" key={field.key}>
@@ -529,6 +626,8 @@ export default function Home() {
                           type="number"
                           step="any"
                           min="0"
+                          max={field.key === "phCaCl2" ? 14 : field.key === "baseSatReported" ? 100 : field.unit === "g/kg" ? (analysis.units?.[field.key] === "%" ? 100 : 1000) : undefined}
+                          disabled={fieldsBlocked || !analysisWritable}
                           value={(analysis[field.key] ?? "") as string | number}
                           onChange={(event) =>
                             setAnalysis({
@@ -540,6 +639,7 @@ export default function Home() {
                         {analysisUnitOptions(field.unit).length > 0 ? (
                           <NativeSelect
                             aria-label={`Unidade de ${field.label}`}
+                            disabled={fieldsBlocked || !analysisWritable}
                             value={analysis.units?.[field.key] ?? field.unit}
                             onChange={(event) => setAnalysis({
                               ...analysis,
@@ -558,7 +658,7 @@ export default function Home() {
                   <div className="analysis-field analysis-field-phosphorus-method">
                     <Label htmlFor="phosphorusMethod">Extrator de fósforo</Label>
                     <div>
-                      <NativeSelect id="phosphorusMethod" value={analysis.phosphorusMethod ?? "Resina"}
+                      <NativeSelect disabled={fieldsBlocked || !analysisWritable} id="phosphorusMethod" value={analysis.phosphorusMethod ?? "Não informado"}
                         onChange={(event) => setAnalysis({ ...analysis, phosphorusMethod: event.target.value })}>
                         {["Resina", "Mehlich 1", "Não informado"].map((method) => (
                           <NativeSelectOption key={method} value={method}>{method}</NativeSelectOption>
@@ -582,7 +682,7 @@ export default function Home() {
                       </span>
                     </div>
                     <div>
-                      <Input id="density" type="number" min="0" step="any"
+                      <Input disabled={fieldsBlocked || !analysisWritable} id="density" type="number" min="0" step="any"
                         value={analysis.density ?? ""}
                         onChange={(event) => setAnalysis({ ...analysis, density: event.target.value })}
                         aria-describedby="density-help" />
@@ -593,7 +693,7 @@ export default function Home() {
                     <Button className="analysis-back-button" variant="outline" type="button" onClick={() => setTab("cadastro")}>
                       Voltar
                     </Button>
-                    <Button type="submit">Salvar e interpretar</Button>
+                    {analysisWritable && <Button type="submit" disabled={fieldsBlocked}>{saving ? "Salvando..." : "Salvar e interpretar"}</Button>}
                   </div>
                 </div>
 
@@ -608,7 +708,7 @@ export default function Home() {
 
             <TabsContent value="relatorio" className="report-page ds-panel">
               {selected && reportLoading && (
-                <p className="empty-copy">Gerando interpretação no backend Java...</p>
+                <p className="empty-copy">Gerando interpretação...</p>
               )}
 
               {selected && !reportLoading && !report && selected.analysis && (
@@ -734,6 +834,23 @@ export default function Home() {
           </Tabs>
         </section>
       </div>
+      <Dialog open={confirmation !== null} onOpenChange={open => { if (!open) { setConfirmation(null); setPendingAnalysis(null); } }}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{confirmation === "first" ? "Confirmar primeiro laudo" : "Reabrir registro atualizado?"}</DialogTitle>
+            <DialogDescription>{confirmation === "first"
+              ? "Confira os resultados e as unidades. Após este salvamento, inclusive com campos em branco, somente um administrador poderá corrigir ou complementar o laudo."
+              : "As alterações não salvas desta tela serão descartadas. Os dados mais recentes serão carregados para sua conferência; nenhum rascunho será aplicado automaticamente."}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setConfirmation(null); setPendingAnalysis(null); }}>Cancelar</Button>
+            <Button type="button" onClick={() => {
+              if (confirmation === "first" && pendingAnalysis) void performAnalysisSave(pendingAnalysis);
+              else if (selected) { setConfirmation(null); void chooseSample(selected); }
+            }}>{confirmation === "first" ? "Confirmar registro do laudo" : "Descartar rascunho e reabrir"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

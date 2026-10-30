@@ -1,4 +1,4 @@
-export type SoilAnalysis = Record<string, number | string | null | Record<string, string>> & {
+export type SoilAnalysis = Record<string, number | string | null | undefined | Record<string, string>> & {
   units?: Record<string, string>;
   density?: number | string | null;
   phosphorusMethod?: string;
@@ -6,6 +6,13 @@ export type SoilAnalysis = Record<string, number | string | null | Record<string
 
 export type Sample = {
   id: string;
+  recordVersion: string | number;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
+  analysisCreatedBy?: string | null;
+  analysisCreatedAt?: string | null;
+  analysisUpdatedBy?: string | null;
   code: string;
   serviceOrderNumber?: string | null;
   block: string;

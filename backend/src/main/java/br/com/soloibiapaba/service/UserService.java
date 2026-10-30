@@ -5,13 +5,16 @@ import br.com.soloibiapaba.domain.User;
 import br.com.soloibiapaba.dto.CreateUserRequest;
 import br.com.soloibiapaba.dto.UpdateUserRequest;
 import br.com.soloibiapaba.dto.UserResponse;
+import br.com.soloibiapaba.exception.DuplicateEmailException;
 import br.com.soloibiapaba.exception.LastAdminException;
 import br.com.soloibiapaba.exception.UserNotFoundException;
 import br.com.soloibiapaba.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -33,34 +36,49 @@ public class UserService {
         return toResponse(findOrThrow(id));
     }
 
+    @Transactional
     public UserResponse createUser(CreateUserRequest request) {
+        String email = normalizeEmail(request.email());
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw new DuplicateEmailException("Já existe um usuário com este e-mail");
+        }
+
         User user = new User(
-                request.name(),
-                request.email(),
+                request.name().strip(),
+                email,
                 passwordEncoder.encode(request.password()),
                 request.role());
 
         return toResponse(userRepository.save(user));
     }
 
+    @Transactional
     public UserResponse updateUser(UUID id, UpdateUserRequest request) {
+        userRepository.findAllForUpdate();
         User user = findOrThrow(id);
+        String email = normalizeEmail(request.email());
 
-        if (user.getRole() == Role.ADMIN && request.role() != Role.ADMIN) {
+        if (userRepository.existsByEmailIgnoreCaseAndIdNot(email, id)) {
+            throw new DuplicateEmailException("Já existe um usuário com este e-mail");
+        }
+
+        if (user.isActive() && user.getRole() == Role.ADMIN && request.role() != Role.ADMIN) {
             ensureNotLastAdmin();
         }
 
-        user.setName(request.name());
-        user.setEmail(request.email());
+        user.setName(request.name().strip());
+        user.setEmail(email);
         user.setRole(request.role());
 
         return toResponse(userRepository.save(user));
     }
 
+    @Transactional
     public UserResponse updateStatus(UUID id, boolean active) {
+        userRepository.findAllForUpdate();
         User user = findOrThrow(id);
 
-        if (!active && user.getRole() == Role.ADMIN) {
+        if (!active && user.isActive() && user.getRole() == Role.ADMIN) {
             ensureNotLastAdmin();
         }
 
@@ -78,6 +96,10 @@ public class UserService {
     private User findOrThrow(UUID id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("Usuário não encontrado"));
+    }
+
+    private String normalizeEmail(String email) {
+        return email.strip().toLowerCase(Locale.ROOT);
     }
 
     private UserResponse toResponse(User user) {
